@@ -3,4 +3,5 @@
 #include "EWIEGA46WW/moc_mainwindow.cpp"
 #include "EWIEGA46WW/moc_menupage.cpp"
 #include "EWIEGA46WW/moc_operationpage.cpp"
+#include "EWIEGA46WW/moc_theorypage.cpp"
 #include "EWIEGA46WW/moc_treeinsertion.cpp"

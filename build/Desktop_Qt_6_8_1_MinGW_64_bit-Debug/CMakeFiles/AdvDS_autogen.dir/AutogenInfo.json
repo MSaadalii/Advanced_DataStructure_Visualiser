@@ -290,6 +290,12 @@
 			null
 		],
 		[
+			"D:/Adv DS Visualizer/AdvDS/theorypage.h",
+			"MU",
+			"EWIEGA46WW/moc_theorypage.cpp",
+			null
+		],
+		[
 			"D:/Adv DS Visualizer/AdvDS/treeinsertion.h",
 			"MU",
 			"EWIEGA46WW/moc_treeinsertion.cpp",
@@ -372,6 +378,7 @@
 		[ "D:/Adv DS Visualizer/AdvDS/mainwindow.cpp", "MU", null ],
 		[ "D:/Adv DS Visualizer/AdvDS/menupage.cpp", "MU", null ],
 		[ "D:/Adv DS Visualizer/AdvDS/operationpage.cpp", "MU", null ],
+		[ "D:/Adv DS Visualizer/AdvDS/theorypage.cpp", "MU", null ],
 		[ "D:/Adv DS Visualizer/AdvDS/treeinsertion.cpp", "MU", null ]
 	],
 	"UIC_OPTIONS" : [],
