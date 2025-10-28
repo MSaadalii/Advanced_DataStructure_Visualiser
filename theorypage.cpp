@@ -61,7 +61,7 @@ void TheoryPage::setupUI()
     titleLabel->setAlignment(Qt::AlignCenter);
     mainLayout->addWidget(titleLabel);
 
-    mainLayout->addSpacing(10);
+    mainLayout->addSpacing(5);
 
     // Scroll area for content
     scrollArea = new QScrollArea(this);
@@ -97,6 +97,7 @@ void TheoryPage::setupUI()
     // Try it yourself button
     tryButton = new QPushButton("Try It Yourself →", this);
     tryButton->setFixedSize(220, 55);
+    tryButton->setContentsMargins(50,200,50,100);
     tryButton->setCursor(Qt::PointingHandCursor);
 
     QFont tryFont("Segoe UI", 15, QFont::Bold);

@@ -595,6 +595,8 @@ AdvDS_autogen/timestamp: \
 	D:/Adv\ DS\ Visualizer/AdvDS/operationpage.h \
 	D:/Adv\ DS\ Visualizer/AdvDS/theorypage.cpp \
 	D:/Adv\ DS\ Visualizer/AdvDS/theorypage.h \
+	D:/Adv\ DS\ Visualizer/AdvDS/treedeletion.cpp \
+	D:/Adv\ DS\ Visualizer/AdvDS/treedeletion.h \
 	D:/Adv\ DS\ Visualizer/AdvDS/treeinsertion.cpp \
 	D:/Adv\ DS\ Visualizer/AdvDS/treeinsertion.h \
 	D:/Adv\ DS\ Visualizer/AdvDS/mainwindow.ui \
