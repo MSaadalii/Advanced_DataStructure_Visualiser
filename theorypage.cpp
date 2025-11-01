@@ -265,7 +265,7 @@ QString TheoryPage::getApplications()
 
 QString TheoryPage::getAdvantages()
 {
-    if (dsName == "Binary Tree") {
+    if (dsName == "Binary Search Tree") {
         return "• Simple and intuitive hierarchical structure<br>"
                "• Forms the basis for more advanced tree structures<br>"
                "• Efficient searching in balanced binary search trees<br>"
