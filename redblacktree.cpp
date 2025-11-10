@@ -8,12 +8,15 @@
 
 RedBlackTree::RedBlackTree(QWidget *parent)
     : QWidget(parent)
+    , isAnimating(false)
 {
     // Initialize NIL node (sentinel)
     NIL = new RBNode(0);
     NIL->color = BLACK;
     NIL->left = NIL->right = NIL->parent = nullptr;
     root = NIL;
+
+    animationTimer = new QTimer(this);
 
     setupUI();
     setMinimumSize(900, 750);
@@ -104,7 +107,7 @@ void RedBlackTree::setupUI()
                 border: none;
                 border-radius: 20px;
                 font-weight: bold;
-                font-size: 16px;
+                font-size: 12px;
             }
             QPushButton:hover { background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #6c3cff, stop:1 #8b5fff); }
         )");

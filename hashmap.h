@@ -16,7 +16,8 @@ public:
         STRING,
         INTEGER,
         DOUBLE,
-        FLOAT
+        FLOAT,
+        CHAR
     };
 
     explicit HashMap(int initialBucketCount = 16, float maxLoadFactor = 0.75f);
@@ -54,7 +55,6 @@ public:
     // Type conversion helpers
     static QString dataTypeToString(DataType type);
     static QString variantToDisplayString(const QVariant &var);
-
     // Hash function (public for visualization)
     int indexFor(const QVariant &key, int bucketCount) const;
 

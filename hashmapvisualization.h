@@ -23,6 +23,7 @@
 #include <QSplitter>
 #include <QComboBox>
 #include <QGroupBox>
+#include <QTabWidget>
 #include "hashmap.h"
 
 class HashMapVisualization : public QWidget
@@ -63,6 +64,8 @@ private:
     void drawBuckets();
     void animateOperation(const QString &operation);
     void animateSearchResult(const QString &key, bool found);
+    void animateSearchByValue(const QString &value, bool found);
+    void showAlgorithm(const QString &operation);
     void showStats();
     QVariant convertStringToVariant(const QString &str, HashMap::DataType type);
 
@@ -78,15 +81,12 @@ private:
     QGraphicsView *visualizationView;
     QGraphicsScene *scene;
 
-
     // Right panel - controls and step trace
     QVBoxLayout *rightLayout;
-
     // Type selection
     QGroupBox *typeGroup;
     QComboBox *keyTypeCombo;
     QComboBox *valueTypeCombo;
-
     // Controls
     QGroupBox *controlGroup;
     QLineEdit *keyInput;
@@ -96,16 +96,17 @@ private:
     QPushButton *deleteButton;
     QPushButton *clearButton;
     QPushButton *randomizeButton;
-
     // Stats
     QGroupBox *statsGroup;
     QLabel *sizeLabel;
     QLabel *bucketCountLabel;
     QLabel *loadFactorLabel;
 
-    // Step trace
+    // Step trace with tabs
     QGroupBox *traceGroup;
+    QTabWidget *traceTabWidget;
     QListWidget *stepsList;
+    QListWidget *algorithmList;
 
     // Data and visualization
     HashMap *hashMap;

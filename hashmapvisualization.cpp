@@ -9,6 +9,8 @@
 #include <QGraphicsDropShadowEffect>
 #include <QScrollBar>
 #include <QSplitterHandle>
+#include <memory>
+
 
 // Define static constants
 const int HashMapVisualization::BUCKET_WIDTH = 80;
@@ -19,7 +21,7 @@ const int HashMapVisualization::MAX_VISIBLE_BUCKETS = 12;
 
 HashMapVisualization::HashMapVisualization(QWidget *parent)
     : QWidget(parent)
-    , hashMap(new HashMap(10, 10.0f))  // 10 buckets, high load factor to prevent rehashing
+    , hashMap(new HashMap(8, 10.0f))  // 8 buckets, high load factor to prevent rehashing
     , animationTimer(new QTimer(this))
     , highlightRect(nullptr)
 {
@@ -55,12 +57,10 @@ void HashMapVisualization::setupUI()
 
     setupVisualizationArea();
     setupRightPanel();
-
     // Set splitter proportions (65% visualization, 35% controls+trace)
     mainSplitter->addWidget(leftPanel);
     mainSplitter->addWidget(rightPanel);
     mainSplitter->setSizes({780, 420});
-
     // Main layout
     QHBoxLayout *mainLayout = new QHBoxLayout(this);
     mainLayout->setContentsMargins(0, 0, 0, 0);
@@ -75,7 +75,6 @@ void HashMapVisualization::setupVisualizationArea()
     leftLayout = new QVBoxLayout(leftPanel);
     leftLayout->setContentsMargins(40, 30, 20, 30);
     leftLayout->setSpacing(25);
-
     // Header with back button and title
     QHBoxLayout *headerLayout = new QHBoxLayout();
 
@@ -102,7 +101,6 @@ void HashMapVisualization::setupVisualizationArea()
         }
     )");
     connect(backButton, &QPushButton::clicked, this, &HashMapVisualization::onBackClicked);
-
     titleLabel = new QLabel("Generic Hash Table");
     QFont titleFont;
     QStringList preferredFonts = {"Segoe UI", "Poppins", "SF Pro Display", "Arial"};
@@ -157,7 +155,7 @@ void HashMapVisualization::setupVisualizationArea()
     leftLayout->addWidget(visualizationView, 1);
 
     // Bottom note about bucket limitation
-    QLabel *bucketNote = new QLabel("* Limited to 10 buckets for screen visibility");
+    QLabel *bucketNote = new QLabel(QString("* Buckets shown: %1").arg(hashMap->bucketCount()));
     bucketNote->setStyleSheet(R"(
         QLabel {
             color: #7f8c8d;
@@ -177,9 +175,8 @@ void HashMapVisualization::setupStatsTopLeft()
     statsLayout->setSpacing(15);
 
     sizeLabel = new QLabel("Size: 0");
-    bucketCountLabel = new QLabel("Buckets: 10");
+    bucketCountLabel = new QLabel(QString("Buckets: %1").arg(hashMap->bucketCount()));
     loadFactorLabel = new QLabel("Load Factor: 0.00");
-
     QString statsStyle = R"(
         QLabel {
             color: #34495e;
@@ -201,7 +198,6 @@ void HashMapVisualization::setupStatsTopLeft()
     statsLayout->addWidget(bucketCountLabel);
     statsLayout->addWidget(loadFactorLabel);
     statsLayout->addStretch();
-
     leftLayout->addLayout(statsLayout);
 }
 
@@ -230,7 +226,7 @@ void HashMapVisualization::setupRightPanel()
 void HashMapVisualization::setupStepTraceTop()
 {
     // Chat history at top of right panel
-    traceGroup = new QGroupBox("Operation History");
+    traceGroup = new QGroupBox("Operation History & Algorithms");
     traceGroup->setStyleSheet(R"(
         QGroupBox {
             font-weight: bold;
@@ -253,6 +249,31 @@ void HashMapVisualization::setupStepTraceTop()
 
     QVBoxLayout *traceLayout = new QVBoxLayout(traceGroup);
     traceLayout->setContentsMargins(15, 20, 15, 15);
+
+    // Create tab widget for steps and algorithms
+    traceTabWidget = new QTabWidget();
+    traceTabWidget->setStyleSheet(R"(
+        QTabWidget::pane {
+            border: 1px solid rgba(74, 144, 226, 0.3);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.9);
+        }
+        QTabBar::tab {
+            background: rgba(74, 144, 226, 0.1);
+            color: #2c3e50;
+            padding: 8px 16px;
+            margin-right: 2px;
+            border-top-left-radius: 6px;
+            border-top-right-radius: 6px;
+        }
+        QTabBar::tab:selected {
+            background: rgba(74, 144, 226, 0.2);
+            font-weight: bold;
+        }
+        QTabBar::tab:hover {
+            background: rgba(74, 144, 226, 0.15);
+        }
+    )");
 
     stepsList = new QListWidget();
     stepsList->setMinimumHeight(250);
@@ -306,7 +327,15 @@ void HashMapVisualization::setupStepTraceTop()
         }
     )");
 
-    traceLayout->addWidget(stepsList);
+    // Create algorithm list widget
+    algorithmList = new QListWidget();
+    algorithmList->setStyleSheet(stepsList->styleSheet());
+
+    // Add both widgets to tabs
+    traceTabWidget->addTab(stepsList, "Steps");
+    traceTabWidget->addTab(algorithmList, "Algorithm");
+
+    traceLayout->addWidget(traceTabWidget);
     rightLayout->addWidget(traceGroup, 2);  // Give it more space (2/3 of right panel)
 }
 
@@ -339,12 +368,12 @@ void HashMapVisualization::setupTypeSelection()
     QLabel *keyLabel = new QLabel("Key:");
     keyLabel->setStyleSheet("color: #2c3e50; font-weight: bold; font-size: 12px;");
     keyTypeCombo = new QComboBox();
-    keyTypeCombo->addItems({"String", "Integer", "Double", "Float"});
+    keyTypeCombo->addItems({"String", "Integer", "Double", "Float", "Char"});
 
     QLabel *valueLabel = new QLabel("Value:");
     valueLabel->setStyleSheet("color: #2c3e50; font-weight: bold; font-size: 12px;");
     valueTypeCombo = new QComboBox();
-    valueTypeCombo->addItems({"String", "Integer", "Double", "Float"});
+    valueTypeCombo->addItems({"String", "Integer", "Double", "Float", "Char"});
 
     QString comboStyle = R"(
         QComboBox {
@@ -566,7 +595,7 @@ void HashMapVisualization::setupStats()
     QHBoxLayout *statsLayout = new QHBoxLayout(statsGroup);
 
     sizeLabel = new QLabel("Size: 0");
-    bucketCountLabel = new QLabel("Buckets: 10");
+    bucketCountLabel = new QLabel(QString("Buckets: %1").arg(hashMap->bucketCount()));
     loadFactorLabel = new QLabel("Load: 0.00");
 
     QString statsStyle = R"(
@@ -643,11 +672,11 @@ void HashMapVisualization::drawBuckets()
     bucketTexts.clear();
     chainTexts.clear();
 
-    const int bucketCount = 10; // Fixed 10 buckets
+    const int bucketCount = hashMap->bucketCount();
     const QVector<int> bucketSizes = hashMap->bucketSizes();
     const QVector<QVector<QPair<QVariant, QVariant>>> bucketContents = hashMap->getBucketContents();
 
-    // Calculate layout for 10 buckets in a single row
+    // Calculate layout for all buckets in a single row
     const int totalWidth = bucketCount * (BUCKET_WIDTH + BUCKET_SPACING) - BUCKET_SPACING;
     const int startX = -totalWidth / 2;
 
@@ -820,7 +849,7 @@ void HashMapVisualization::updateStepTrace()
 void HashMapVisualization::showStats()
 {
     sizeLabel->setText(QString("Size: %1").arg(hashMap->size()));
-    bucketCountLabel->setText(QString("Buckets: 10"));  // Fixed to 10
+    bucketCountLabel->setText(QString("Buckets: %1").arg(hashMap->bucketCount()));
     loadFactorLabel->setText(QString("Load Factor: %1").arg(hashMap->loadFactor(), 0, 'f', 2));
 }
 
@@ -877,6 +906,10 @@ QVariant HashMapVisualization::convertStringToVariant(const QString &str, HashMa
         float floatVal = str.toFloat(&ok);
         return ok ? QVariant(floatVal) : QVariant();
     }
+    case HashMap::CHAR: {
+        if (str.isEmpty()) return QVariant();
+        return QVariant(QChar(str.at(0)));
+    }
     default:
         return QVariant();
     }
@@ -915,6 +948,7 @@ void HashMapVisualization::onInsertClicked()
 
     hashMap->put(key, value);
     animateOperation("Insert");
+    showAlgorithm("Insert");
 
     // Clear inputs
     keyInput->clear();
@@ -953,6 +987,7 @@ void HashMapVisualization::onSearchClicked()
         // Perform search by key
         auto result = hashMap->get(key);
         animateOperation("Search");
+        showAlgorithm("Search");
 
         // If found, show the value in the history
         if (result.has_value()) {
@@ -976,12 +1011,133 @@ void HashMapVisualization::onSearchClicked()
             return;
         }
 
-        // Perform search by value
+        // Perform search by value with animation
         auto result = hashMap->findByValue(value);
         animateOperation("Search by Value");
+        showAlgorithm("Search by Value");
+
+        // Animate searching through all buckets
+        animateSearchByValue(valueStr, result.has_value());
+    }
+}
+
+void HashMapVisualization::animateSearchByValue(const QString &value, bool found)
+{
+    // Animate searching through all buckets sequentially
+    const int totalBuckets = hashMap->bucketCount();
+
+    // Create a shared pointer to track the current bucket and found bucket
+    auto currentBucket = std::make_shared<int>(0);
+    auto foundBucket = std::make_shared<int>(-1);
+
+    // Find which bucket contains the value for detailed history
+    if (found) {
+        const QVector<QVector<QPair<QVariant, QVariant>>> bucketContents = hashMap->getBucketContents();
+        for (int i = 0; i < bucketContents.size(); ++i) {
+            for (int j = 0; j < bucketContents[i].size(); ++j) {
+                QVariant convertedValue = convertStringToVariant(value, hashMap->getValueType());
+                if (bucketContents[i][j].second == convertedValue) {
+                    *foundBucket = i;
+                    break;
+                }
+            }
+            if (*foundBucket != -1) break;
+        }
+    }
+
+    // Create a timer for sequential animation
+    QTimer *animTimer = new QTimer(this);
+    animTimer->setInterval(300);
+
+    connect(animTimer, &QTimer::timeout, [this, animTimer, currentBucket, totalBuckets, foundBucket, value, found]() {
+        if (*currentBucket >= totalBuckets) {
+            // Animation complete
+            animTimer->stop();
+            animTimer->deleteLater();
+
+            // Add detailed result to history
+            if (found && *foundBucket != -1) {
+                const QVector<QVector<QPair<QVariant, QVariant>>> bucketContents = hashMap->getBucketContents();
+                int position = -1;
+                QVariant foundKey;
+
+                // Find position within the bucket
+                QVariant convertedValue = convertStringToVariant(value, hashMap->getValueType());
+                for (int j = 0; j < bucketContents[*foundBucket].size(); ++j) {
+                    if (bucketContents[*foundBucket][j].second == convertedValue) {
+                        position = j + 1; // 1-based position for user display
+                        foundKey = bucketContents[*foundBucket][j].first;
+                        break;
+                    }
+                }
+
+                hashMap->addStepToHistory(QString("✅ Value '%1' found at bucket %2, position %3 (key: %4)")
+                                              .arg(value)
+                                              .arg(*foundBucket)
+                                              .arg(position)
+                                              .arg(HashMap::variantToDisplayString(foundKey)));
+            } else {
+                hashMap->addStepToHistory(QString("❌ Value '%1' not found in any bucket").arg(value));
+            }
+            updateStepTrace();
+
+            // Clear highlight
+            if (highlightRect) {
+                scene->removeItem(highlightRect);
+                delete highlightRect;
+                highlightRect = nullptr;
+            }
+            return;
+        }
+
+        // Clear previous highlight
+        if (highlightRect) {
+            scene->removeItem(highlightRect);
+            delete highlightRect;
+            highlightRect = nullptr;
+        }
+
+        // Calculate bucket position
+        const int totalWidth = totalBuckets * (BUCKET_WIDTH + BUCKET_SPACING) - BUCKET_SPACING;
+        const int startX = -totalWidth / 2;
+        const int x = startX + (*currentBucket) * (BUCKET_WIDTH + BUCKET_SPACING);
+        const int y = 0;
+
+        // Calculate bucket height
+        const QVector<QVector<QPair<QVariant, QVariant>>> bucketContents = hashMap->getBucketContents();
+        int bucketHeight = BUCKET_HEIGHT;
+        if (*currentBucket < bucketContents.size() && !bucketContents[*currentBucket].isEmpty()) {
+            bucketHeight = BUCKET_HEIGHT + (bucketContents[*currentBucket].size() * 30);
+        }
+
+        // Create highlight effect (blue for searching, green if this is the found bucket)
+        QColor highlightColor = (*currentBucket == *foundBucket && found) ?
+                                    QColor(40, 167, 69, 200) : QColor(52, 152, 219, 200);
+
+        highlightRect = scene->addRect(x - 3, y - 3, BUCKET_WIDTH + 6, bucketHeight + 6,
+                                       QPen(highlightColor, 3),
+                                       QBrush(Qt::transparent));
+        highlightRect->setZValue(10);
+
+        // Add step to history for current bucket being checked
+        hashMap->addStepToHistory(QString("🔍 Checking bucket %1...").arg(*currentBucket));
         updateStepTrace();
 
-        // No bucket highlighting for value search (searches all buckets)
+        (*currentBucket)++;
+    });
+
+    // Start animation
+    animTimer->start();
+
+    // Keep the highlight on the found bucket longer
+    if (found) {
+        QTimer::singleShot(300 * totalBuckets + 2000, [this]() {
+            if (highlightRect) {
+                scene->removeItem(highlightRect);
+                delete highlightRect;
+                highlightRect = nullptr;
+            }
+        });
     }
 }
 
@@ -992,7 +1148,7 @@ void HashMapVisualization::animateSearchResult(const QString &key, bool found)
     if (!keyVariant.isValid()) return;
 
     // Calculate which bucket the key would be in using HashMap's indexFor method
-    const int bucketIndex = hashMap->indexFor(keyVariant, 10);
+    const int bucketIndex = hashMap->indexFor(keyVariant, hashMap->bucketCount());
 
     // Step 1: Show hash calculation (like Binary Tree's step-by-step approach)
     hashMap->addStepToHistory(QString("🔍 Searching for key: %1").arg(key));
@@ -1012,7 +1168,7 @@ void HashMapVisualization::animateSearchResult(const QString &key, bool found)
         }
 
         // Create highlight rectangle for the target bucket
-        const int bucketCount = 10;
+        const int bucketCount = hashMap->bucketCount();
         const int totalWidth = bucketCount * (BUCKET_WIDTH + BUCKET_SPACING) - BUCKET_SPACING;
         const int startX = -totalWidth / 2;
         const int x = startX + bucketIndex * (BUCKET_WIDTH + BUCKET_SPACING);
@@ -1077,6 +1233,7 @@ void HashMapVisualization::onDeleteClicked()
 
     bool removed = hashMap->erase(key);
     animateOperation("Delete");
+    showAlgorithm("Delete");
 
     // Animate the deletion result
     animateSearchResult(keyStr, removed);
@@ -1088,6 +1245,7 @@ void HashMapVisualization::onClearClicked()
 {
     hashMap->clear();
     animateOperation("Clear");
+    showAlgorithm("Clear");
     // Visual feedback - flash the entire visualization
     QPropertyAnimation *flashAnimation = new QPropertyAnimation(visualizationView, "opacity");
     flashAnimation->setDuration(300);
@@ -1133,6 +1291,12 @@ void HashMapVisualization::onRandomizeClicked()
         case HashMap::FLOAT:
             key = static_cast<float>(QRandomGenerator::global()->generateDouble() * 100.0f);
             break;
+        case HashMap::CHAR: {
+            const QString alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+            int idx = QRandomGenerator::global()->bounded(alphabet.size());
+            key = QVariant(QChar(alphabet.at(idx)));
+            break;
+        }
         }
 
         // Generate random value based on type
@@ -1151,12 +1315,125 @@ void HashMapVisualization::onRandomizeClicked()
         case HashMap::FLOAT:
             value = static_cast<float>(QRandomGenerator::global()->generateDouble() * 1000.0f);
             break;
+        case HashMap::CHAR: {
+            const QString alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+            int idx = QRandomGenerator::global()->bounded(alphabet.size());
+            value = QVariant(QChar(alphabet.at(idx)));
+            break;
+        }
         }
 
         hashMap->put(key, value);
     }
 
     animateOperation("Randomize");
+    showAlgorithm("Randomize");
+}
+
+void HashMapVisualization::showAlgorithm(const QString &operation)
+{
+    // Keep history in algorithm page similar to Steps: append entries, don't clear
+    // Add a visual separator between operations if there are already items
+    if (algorithmList->count() > 0) {
+        QListWidgetItem *separator = new QListWidgetItem("────────────────────");
+        separator->setTextAlignment(Qt::AlignCenter);
+        separator->setFlags(Qt::NoItemFlags);
+        algorithmList->addItem(separator);
+    }
+
+    if (operation == "Insert" || operation == "Put") {
+        algorithmList->addItem("🔧 HashMap Insert Algorithm:");
+        algorithmList->addItem("");
+        algorithmList->addItem("1. Calculate hash value: hash(key)");
+        algorithmList->addItem("2. Find bucket index: hash % bucket_count");
+        algorithmList->addItem("3. Navigate to the bucket");
+        algorithmList->addItem("4. Search through the chain:");
+        algorithmList->addItem("   • If key exists: update value");
+        algorithmList->addItem("   • If key not found: add new node");
+        algorithmList->addItem("5. Increment size if new key added");
+        algorithmList->addItem("");
+        algorithmList->addItem("⏰ Time Complexity:");
+        algorithmList->addItem("   • Average: O(1)");
+        algorithmList->addItem("   • Worst: O(n) - all keys in same bucket");
+        algorithmList->addItem("");
+        algorithmList->addItem("🔗 Collision Resolution: Open Chaining");
+        algorithmList->addItem("   Multiple keys in same bucket form a linked list");
+
+    } else if (operation == "Search" || operation == "Get") {
+        algorithmList->addItem("🔍 HashMap Search Algorithm:");
+        algorithmList->addItem("");
+        algorithmList->addItem("1. Calculate hash value: hash(key)");
+        algorithmList->addItem("2. Find bucket index: hash % bucket_count");
+        algorithmList->addItem("3. Navigate to the bucket");
+        algorithmList->addItem("4. Traverse the chain:");
+        algorithmList->addItem("   • Compare each key with target");
+        algorithmList->addItem("   • If match found: return value");
+        algorithmList->addItem("   • If end reached: key not found");
+        algorithmList->addItem("");
+        algorithmList->addItem("⏰ Time Complexity:");
+        algorithmList->addItem("   • Average: O(1)");
+        algorithmList->addItem("   • Worst: O(n) - all keys in same bucket");
+
+    } else if (operation == "Search by Value") {
+        algorithmList->addItem("🔍 HashMap Search by Value Algorithm:");
+        algorithmList->addItem("");
+        algorithmList->addItem("1. Linear scan through all buckets (0 to n-1)");
+        algorithmList->addItem("2. For each bucket:");
+        algorithmList->addItem("   • Traverse the entire chain");
+        algorithmList->addItem("   • Compare each value with target");
+        algorithmList->addItem("   • If match found: return key");
+        algorithmList->addItem("3. If no match in any bucket: not found");
+        algorithmList->addItem("");
+        algorithmList->addItem("⏰ Time Complexity:");
+        algorithmList->addItem("   • Always: O(n) - must check all elements");
+        algorithmList->addItem("");
+        algorithmList->addItem("📝 Note: HashMaps are optimized for key-based");
+        algorithmList->addItem("   access, not value-based searches");
+
+    } else if (operation == "Delete" || operation == "Remove") {
+        algorithmList->addItem("🗑️ HashMap Delete Algorithm:");
+        algorithmList->addItem("");
+        algorithmList->addItem("1. Calculate hash value: hash(key)");
+        algorithmList->addItem("2. Find bucket index: hash % bucket_count");
+        algorithmList->addItem("3. Navigate to the bucket");
+        algorithmList->addItem("4. Search through the chain:");
+        algorithmList->addItem("   • Compare each key with target");
+        algorithmList->addItem("   • If match found: remove node from chain");
+        algorithmList->addItem("   • If not found: return false");
+        algorithmList->addItem("5. Decrement size if key was removed");
+        algorithmList->addItem("");
+        algorithmList->addItem("⏰ Time Complexity:");
+        algorithmList->addItem("   • Average: O(1)");
+        algorithmList->addItem("   • Worst: O(n) - all keys in same bucket");
+
+    } else if (operation == "Clear") {
+        algorithmList->addItem("🧹 HashMap Clear Algorithm:");
+        algorithmList->addItem("");
+        algorithmList->addItem("1. Iterate through all buckets");
+        algorithmList->addItem("2. For each bucket:");
+        algorithmList->addItem("   • Clear the entire chain");
+        algorithmList->addItem("   • Reset bucket to empty state");
+        algorithmList->addItem("3. Reset size to 0");
+        algorithmList->addItem("");
+        algorithmList->addItem("⏰ Time Complexity: O(n)");
+        algorithmList->addItem("   Must visit every element to deallocate");
+
+    } else if (operation == "Randomize") {
+        algorithmList->addItem("🎲 HashMap Randomize Algorithm:");
+        algorithmList->addItem("");
+        algorithmList->addItem("1. Generate random key-value pairs");
+        algorithmList->addItem("2. For each pair:");
+        algorithmList->addItem("   • Create key based on selected type");
+        algorithmList->addItem("   • Create value based on selected type");
+        algorithmList->addItem("   • Insert using standard insert algorithm");
+        algorithmList->addItem("");
+        algorithmList->addItem("📊 Sample Data Types:");
+        algorithmList->addItem("   • Strings: fruit names, colors");
+        algorithmList->addItem("   • Integers: random numbers 1-100");
+        algorithmList->addItem("   • Doubles/Floats: random decimals");
+    }
+
+    // Do not auto-switch tabs; keep user's current selection
 }
 
 void HashMapVisualization::paintEvent(QPaintEvent *event)

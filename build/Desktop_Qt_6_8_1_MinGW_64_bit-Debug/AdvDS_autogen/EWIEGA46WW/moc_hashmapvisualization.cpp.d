@@ -194,6 +194,7 @@ D:/Adv\ DS\ Visualizer/AdvDS/build/Desktop_Qt_6_8_1_MinGW_64_bit-Debug/AdvDS_aut
   C:/Qt/6.8.1/mingw_64/include/QtWidgets/QPushButton \
   C:/Qt/6.8.1/mingw_64/include/QtWidgets/QScrollArea \
   C:/Qt/6.8.1/mingw_64/include/QtWidgets/QSplitter \
+  C:/Qt/6.8.1/mingw_64/include/QtWidgets/QTabWidget \
   C:/Qt/6.8.1/mingw_64/include/QtWidgets/QVBoxLayout \
   C:/Qt/6.8.1/mingw_64/include/QtWidgets/QWidget \
   C:/Qt/6.8.1/mingw_64/include/QtWidgets/qabstractbutton.h \

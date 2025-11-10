@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <functional>
+#include <string>
 
 HashMap::HashMap(int initialBucketCount, float maxLoadFactor)
     : buckets_(static_cast<size_t>(std::max(1, initialBucketCount))),
@@ -16,6 +18,7 @@ QString HashMap::dataTypeToString(DataType type) {
     case INTEGER: return "Integer";
     case DOUBLE: return "Double";
     case FLOAT: return "Float";
+    case CHAR: return "Char";
     default: return "Unknown";
     }
 }
@@ -29,38 +32,55 @@ QString HashMap::variantToDisplayString(const QVariant &var) {
         return QString::number(var.toDouble(), 'f', 2);
     } else if (var.canConvert<float>()) {
         return QString::number(var.toFloat(), 'f', 2);
+    } else if (var.type() == QVariant::Char) {
+        return QString(var.toChar());
     }
     return var.toString();
 }
 
 int HashMap::indexFor(const QVariant &key, int bucketCount) const {
-    size_t hash;
+    size_t hashValue = 0;
 
-    // Simple hash functions for educational purposes
+    // Use std::hash-like behavior to mirror unordered_map hashing
     switch (key.type()) {
     case QVariant::String: {
-        // For strings, use Qt's hash function
-        hash = qHash(key.toString());
+        const std::string s = key.toString().toStdString();
+        hashValue = std::hash<std::string>{}(s);
         break;
     }
     case QVariant::Int: {
-        // For integers, hash = key itself (simple modulo will work)
-        int intKey = key.toInt();
-        hash = static_cast<size_t>(intKey >= 0 ? intKey : -intKey); // Use absolute value for negative numbers
+        const int v = key.toInt();
+        hashValue = std::hash<int>{}(v);
         break;
     }
     case QVariant::Double: {
-        // For double/float, convert to int for simplicity
-        double doubleKey = key.toDouble();
-        hash = static_cast<size_t>(std::abs(static_cast<int>(doubleKey)));
+        // QVariant stores float as double by default; both map through std::hash<double>
+        const double v = key.toDouble();
+        hashValue = std::hash<double>{}(v);
         break;
     }
-    default:
-        hash = qHash(key.toString());
+    case QVariant::Char: {
+        const QChar qc = key.toChar();
+        const char c = qc.toLatin1();
+        hashValue = std::hash<char>{}(c);
+        break;
+    }
+    default: {
+        // Try float explicitly if convertible
+        if (key.canConvert<float>()) {
+            const float v = key.toFloat();
+            hashValue = std::hash<float>{}(v);
+        } else {
+            // Fallback to string representation
+            const std::string s = key.toString().toStdString();
+            hashValue = std::hash<std::string>{}(s);
+        }
+        break;
+    }
     }
 
-    // Standard hash function: hash % n
-    return static_cast<int>(hash % static_cast<size_t>(bucketCount));
+    // bucket_index = hash(key) % bucketCount
+    return static_cast<int>(hashValue % static_cast<size_t>(bucketCount));
 }
 
 bool HashMap::validateType(const QVariant &value, DataType expectedType) const {
@@ -73,6 +93,8 @@ bool HashMap::validateType(const QVariant &value, DataType expectedType) const {
         return value.canConvert<double>();
     case FLOAT:
         return value.canConvert<float>();
+    case CHAR:
+        return value.canConvert<QChar>();
     default:
         return false;
     }
@@ -136,7 +158,14 @@ bool HashMap::emplaceOrAssign(const QVariant &key, const QVariant &value, bool a
     // Use our custom indexFor method which shows the simple hash
     const int index = indexFor(key, bucketCountNow);
 
-    addStep(QStringLiteral("Index = %1 %% %2 = %3").arg(keyStr).arg(bucketCountNow).arg(index));
+    // Show hash calculation based on type
+    if (key.type() == QVariant::Int || key.type() == QVariant::Double) {
+        addStep(QString("📊 Compute: hash(%1) = %1").arg(keyStr));
+        addStep(QString("📐 Calculate: %1 % %2 = %3").arg(keyStr).arg(bucketCountNow).arg(index));
+    } else {
+        addStep(QString("📊 Compute hash for: \"%1\"").arg(keyStr));
+        addStep(QString("📐 Index = hash % %1 = %2").arg(bucketCountNow).arg(index));
+    }
     addStep(QStringLiteral("Visit bucket %1").arg(index));
 
     auto &chain = buckets_[static_cast<size_t>(index)];
@@ -196,8 +225,15 @@ std::optional<QVariant> HashMap::get(const QVariant &key) {
     // Use our custom indexFor method
     const int index = indexFor(key, bucketCountNow);
 
-    addStep(QStringLiteral("Index = %1 %% %2 = %3").arg(keyStr).arg(bucketCountNow).arg(index));
-    addStep(QStringLiteral("Visit bucket %1").arg(index));
+    // Show hash calculation
+    if (key.type() == QVariant::Int || key.type() == QVariant::Double) {
+        addStep(QString("📊 Compute: hash(%1) = %1").arg(keyStr));
+        addStep(QString("📐 Calculate: %1 % %2 = %3").arg(keyStr).arg(bucketCountNow).arg(index));
+    } else {
+        addStep(QString("📊 Compute hash for: \"%1\"").arg(keyStr));
+        addStep(QString("📐 Index = hash % %1 = %2").arg(bucketCountNow).arg(index));
+    }
+    addStep(QString("🎯 Visit bucket %1").arg(index));
 
     const auto &chain = buckets_[static_cast<size_t>(index)];
     for (const auto &node : chain) {
@@ -232,7 +268,14 @@ bool HashMap::erase(const QVariant &key) {
     // Use our custom indexFor method
     const int index = indexFor(key, bucketCountNow);
 
-    addStep(QStringLiteral("Index = %1 %% %2 = %3").arg(keyStr).arg(bucketCountNow).arg(index));
+    // Show hash calculation for delete operation
+    if (key.type() == QVariant::Int || key.type() == QVariant::Double) {
+        addStep(QString("📊 Compute: hash(%1) = %1").arg(keyStr));
+        addStep(QString("📐 Calculate: %1 % %2 = %3").arg(keyStr).arg(bucketCountNow).arg(index));
+    } else {
+        addStep(QString("📊 Compute hash for: \"%1\"").arg(keyStr));
+        addStep(QString("📐 Index = hash % %1 = %2").arg(bucketCountNow).arg(index));
+    }
     addStep(QStringLiteral("Visit bucket %1").arg(index));
 
     auto &chain = buckets_[static_cast<size_t>(index)];
@@ -263,28 +306,44 @@ bool HashMap::contains(const QVariant &key) {
 }
 
 std::optional<QVariant> HashMap::findByValue(const QVariant &value) {
-    addStep("🔍 Searching for value...");
+    addStep("🔍 === SEARCH BY VALUE OPERATION ===");
     QString valueStr = variantToDisplayString(value);
-    addStep(QString("Looking for value: %1").arg(valueStr));
+    addStep(QString("🎯 Target value: %1").arg(valueStr));
+    addStep(QString("📝 Algorithm: Linear search through all buckets"));
 
+    int totalChecked = 0;
     // Search through all buckets
     for (size_t i = 0; i < buckets_.size(); ++i) {
-        addStep(QString("Checking bucket %1...").arg(i));
+        addStep(QString("🔎 Checking bucket %1...").arg(i));
 
+        int itemsInBucket = 0;
         for (const auto &node : buckets_[i]) {
+            itemsInBucket++;
+            totalChecked++;
             QString currentValue = variantToDisplayString(node.value);
+            QString currentKey = variantToDisplayString(node.key);
+
+            addStep(QString("   Comparing: <%1,%2> value == %3?")
+                        .arg(currentKey, currentValue, valueStr));
 
             // Compare values
             if (node.value == value) {
-                QString keyStr = variantToDisplayString(node.key);
-                addStep(QString("✅ Found! Value '%1' has Key '%2' in bucket %3")
-                            .arg(valueStr, keyStr).arg(i));
+                addStep(QString("✅ FOUND! Value '%1' at:").arg(valueStr));
+                addStep(QString("   📍 Bucket: %1").arg(i));
+                addStep(QString("   🔑 Key: %1").arg(currentKey));
+                addStep(QString("   📊 Total items checked: %1").arg(totalChecked));
                 return node.key; // Return the key associated with this value
             }
         }
+
+        if (itemsInBucket == 0) {
+            addStep(QString("   Bucket %1 is empty").arg(i));
+        }
     }
 
-    addStep(QString("❌ Value '%1' not found in any bucket").arg(valueStr));
+    addStep(QString("❌ NOT FOUND: Value '%1' not in any bucket").arg(valueStr));
+    addStep(QString("📊 Total items checked: %1 across %2 buckets")
+                .arg(totalChecked).arg(buckets_.size()));
     return std::nullopt;
 }
 
@@ -346,7 +405,6 @@ QVector<int> HashMap::bucketSizes() const {
 QVector<QVector<QPair<QVariant, QVariant>>> HashMap::getBucketContents() const {
     QVector<QVector<QPair<QVariant, QVariant>>> contents;
     contents.reserve(static_cast<int>(buckets_.size()));
-
     for (const auto &chain : buckets_) {
         QVector<QPair<QVariant, QVariant>> bucketItems;
         for (const auto &node : chain) {
@@ -354,7 +412,6 @@ QVector<QVector<QPair<QVariant, QVariant>>> HashMap::getBucketContents() const {
         }
         contents.push_back(bucketItems);
     }
-
     return contents;
 }
 

@@ -25,9 +25,11 @@ struct RBNode {
     RBNode *parent;
     int x, y;
     bool isHighlighted;
+    bool isRotating;
 
     RBNode(int val) : value(val), color(RED), left(nullptr), right(nullptr),
-        parent(nullptr), x(0), y(0), isHighlighted(false) {}
+        parent(nullptr), x(0), y(0), isHighlighted(false),
+        isRotating(false) {}
 };
 
 struct HistoryEntry {
@@ -79,6 +81,11 @@ private:
     void fixDelete(RBNode* node);
     RBNode* findMin(RBNode* node);
     void transplant(RBNode* u, RBNode* v);
+    RBNode* deleteNodeHelper(RBNode* node, int value);
+
+    // Animation
+    void animateRotation(RBNode* node, const QString& direction);
+    void highlightNode(RBNode* node, int delay);
 
     // Drawing
     void calculateNodePositions(RBNode *node, int x, int y, int horizontalSpacing);
@@ -123,6 +130,10 @@ private:
 
     // History
     QVector<HistoryEntry> history;
+
+    // Animation
+    bool isAnimating;
+    QTimer *animationTimer;
 
     // Drawing constants
     const int NODE_RADIUS = 25;
