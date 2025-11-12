@@ -7,6 +7,7 @@
 #include "menupage.h"
 #include "operationpage.h"
 #include "treeinsertion.h"
+#include "graphvisualization.h"
 
 int main(int argc, char *argv[])
 {
@@ -31,6 +32,7 @@ int main(int argc, char *argv[])
     // Variables to track pages
     OperationPage *currentOperationPage = nullptr;
     TreeInsertion *currentTreeInsertion = nullptr;
+    GraphVisualization *currentGraphVisualization = nullptr;
     int operationPageIndex = -1;
     int visualizationPageIndex = -1;
     QString currentDataStructure = "";
@@ -40,13 +42,37 @@ int main(int argc, char *argv[])
         mainWindow->setCurrentIndex(menuPageIndex);
     });
 
-    // Connect MenuPage to OperationPage navigation
+    // Connect MenuPage navigation
     QObject::connect(menuPage, &MenuPage::dataStructureSelected,
                      [mainWindow, &currentOperationPage, &operationPageIndex, &currentDataStructure,
-                      &currentTreeInsertion, &visualizationPageIndex, menuPageIndex](const QString &dsName) {
+                      &currentTreeInsertion, &currentGraphVisualization, &visualizationPageIndex, menuPageIndex](const QString &dsName) {
                          // Store current data structure
                          currentDataStructure = dsName;
 
+                         // For Graph, skip operation page and go directly to visualization
+                         if (dsName == "Graph") {
+                             // Remove old visualization if exists
+                             if (currentGraphVisualization) {
+                                 mainWindow->removeWidget(currentGraphVisualization);
+                                 currentGraphVisualization->deleteLater();
+                                 currentGraphVisualization = nullptr;
+                             }
+                             
+                             // Create graph visualization directly
+                             currentGraphVisualization = new GraphVisualization();
+                             visualizationPageIndex = mainWindow->addWidget(currentGraphVisualization);
+
+                             // Connect back button to menu
+                             QObject::connect(currentGraphVisualization, &GraphVisualization::backToMenu,
+                                              [mainWindow, menuPageIndex]() {
+                                                  mainWindow->setCurrentIndex(menuPageIndex);
+                                              });
+
+                             mainWindow->setCurrentIndex(visualizationPageIndex);
+                             return;
+                         }
+
+                         // For other data structures, show operation page
                          // Remove old operation page if exists
                          if (currentOperationPage) {
                              mainWindow->removeWidget(currentOperationPage);
@@ -65,8 +91,8 @@ int main(int argc, char *argv[])
 
                          // Connect operation selection
                          QObject::connect(currentOperationPage, &OperationPage::operationSelected,
-                                          [mainWindow, &currentTreeInsertion, &visualizationPageIndex,
-                                           &operationPageIndex, &currentDataStructure](const QString &operation) {
+                                         [mainWindow, &currentTreeInsertion, &currentDataStructure, &visualizationPageIndex,
+                                          &operationPageIndex](const QString &operation) {
                                               // Remove old visualization page if exists
                                               if (currentTreeInsertion) {
                                                   mainWindow->removeWidget(currentTreeInsertion);
