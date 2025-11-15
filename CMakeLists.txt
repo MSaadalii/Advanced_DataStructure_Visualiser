@@ -25,11 +25,15 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         ${PROJECT_SOURCES}
         homepage.h homepage.cpp
         menupage.h menupage.cpp
-        operationpage.h operationpage.cpp
+        basevisualization.h basevisualization.cpp
+        traversalvisualization.h
+        uiutils.h uiutils.cpp
+        backbutton.h backbutton.cpp
+        stylemanager.h stylemanager.cpp
+        widgetmanager.h widgetmanager.cpp
         treeinsertion.h treeinsertion.cpp
         graphvisualization.h graphvisualization.cpp
         theorypage.h theorypage.cpp
-        treedeletion.h treedeletion.cpp
         hashmap.h hashmap.cpp
         hashmapvisualization.h hashmapvisualization.cpp
         redblacktree.h redblacktree.cpp

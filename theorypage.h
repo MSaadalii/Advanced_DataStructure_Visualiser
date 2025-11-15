@@ -5,8 +5,10 @@
 #include <QPushButton>
 #include <QLabel>
 #include <QVBoxLayout>
+#include <QGridLayout>
 #include <QScrollArea>
 #include <QFrame>
+#include "backbutton.h"
 
 class TheoryPage : public QWidget
 {
@@ -34,7 +36,7 @@ private:
     QWidget* createInfoCard(const QString &title, const QString &content, const QString &icon);
 
     QString dsName;
-    QPushButton *backButton;
+    BackButton *backButton;
     QPushButton *tryButton;
     QLabel *titleLabel;
     QScrollArea *scrollArea;

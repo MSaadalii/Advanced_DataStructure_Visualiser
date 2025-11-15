@@ -8,7 +8,7 @@
 #include <optional>
 #include <vector>
 
-// Generic HashMap supporting multiple data types for keys and values.
+// Hash Map supporting multiple data types for keys and values.
 // Instrumented with a human-readable step trace for visualization.
 class HashMap {
 public:
@@ -34,7 +34,6 @@ public:
     std::optional<QVariant> get(const QVariant &key);
     bool erase(const QVariant &key);
     bool contains(const QVariant &key);
-    std::optional<QVariant> findByValue(const QVariant &value);
 
     void clear();
 

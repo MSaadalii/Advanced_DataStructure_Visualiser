@@ -24,7 +24,21 @@
 #include <QComboBox>
 #include <QGroupBox>
 #include <QTabWidget>
+#include <QPainter>
+#include <QLinearGradient>
+#include <QFont>
+#include <QFontDatabase>
+#include <QDebug>
+#include <QMessageBox>
+#include <QRandomGenerator>
+#include <QGraphicsDropShadowEffect>
+#include <QScrollBar>
+#include <QSplitterHandle>
+#include <memory>
 #include "hashmap.h"
+#include "backbutton.h"
+#include "stylemanager.h"
+#include "widgetmanager.h"
 
 class HashMapVisualization : public QWidget
 {
@@ -56,15 +70,12 @@ private:
     void setupVisualizationArea();
     void setupRightPanel();
     void setupTypeSelection();
-    void setupControls();
-    void setupStats();
-    void setupStatsTopLeft();
+    void setupStatsAndControls();
     void setupStepTrace();
     void setupStepTraceTop();
     void drawBuckets();
     void animateOperation(const QString &operation);
     void animateSearchResult(const QString &key, bool found);
-    void animateSearchByValue(const QString &value, bool found);
     void showAlgorithm(const QString &operation);
     void showStats();
     QVariant convertStringToVariant(const QString &str, HashMap::DataType type);
@@ -76,7 +87,7 @@ private:
 
     // Left panel - visualization and controls
     QVBoxLayout *leftLayout;
-    QPushButton *backButton;
+    BackButton *backButton;
     QLabel *titleLabel;
     QGraphicsView *visualizationView;
     QGraphicsScene *scene;
@@ -88,7 +99,6 @@ private:
     QComboBox *keyTypeCombo;
     QComboBox *valueTypeCombo;
     // Controls
-    QGroupBox *controlGroup;
     QLineEdit *keyInput;
     QLineEdit *valueInput;
     QPushButton *insertButton;
@@ -96,8 +106,7 @@ private:
     QPushButton *deleteButton;
     QPushButton *clearButton;
     QPushButton *randomizeButton;
-    // Stats
-    QGroupBox *statsGroup;
+    // Stats (main area only)
     QLabel *sizeLabel;
     QLabel *bucketCountLabel;
     QLabel *loadFactorLabel;

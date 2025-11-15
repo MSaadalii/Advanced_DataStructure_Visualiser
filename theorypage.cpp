@@ -4,6 +4,7 @@
 #include <QRadialGradient>
 #include <QFont>
 #include <QFontDatabase>
+#include <QGraphicsDropShadowEffect>
 
 TheoryPage::TheoryPage(const QString &dataStructureName, QWidget *parent)
     : QWidget(parent)
@@ -20,166 +21,171 @@ TheoryPage::~TheoryPage()
 
 void TheoryPage::setupUI()
 {
-    // Main layout
+    // Main layout with better spacing
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
-    mainLayout->setContentsMargins(40, 35, 40, 35);
-    mainLayout->setSpacing(20);
+    mainLayout->setContentsMargins(30, 25, 30, 25);
+    mainLayout->setSpacing(15);
 
     // Header section
     QHBoxLayout *headerLayout = new QHBoxLayout();
 
-    // Back button
-    backButton = new QPushButton("← Back to Menu", this);
-    backButton->setFixedSize(140, 38);
-    backButton->setCursor(Qt::PointingHandCursor);
-
-    QFont buttonFont("Segoe UI", 11);
-    backButton->setFont(buttonFont);
-    backButton->setStyleSheet(R"(
-        QPushButton {
-            background-color: rgba(123, 79, 255, 0.1);
-            color: #7b4fff;
-            border: 2px solid #7b4fff;
-            border-radius: 19px;
-            padding: 8px 16px;
-        }
-        QPushButton:hover {
-            background-color: rgba(123, 79, 255, 0.2);
-        }
-    )");
+    // Back button with improved styling
+    backButton = new BackButton(BackButton::BackToMenu, this);
+    backButton->setFixedSize(150, 42);
 
     headerLayout->addWidget(backButton, 0, Qt::AlignLeft);
     headerLayout->addStretch();
 
     mainLayout->addLayout(headerLayout);
 
-    // Title
+    // Title with better typography
     titleLabel = new QLabel(dsName, this);
-    QFont titleFont("Segoe UI", 36, QFont::Bold);
+    QFont titleFont("Segoe UI", 32, QFont::Bold);
     titleLabel->setFont(titleFont);
-    titleLabel->setStyleSheet("color: #2d1b69; background: transparent;");
+    titleLabel->setStyleSheet(R"(
+        QLabel {
+            color: #1a202c;
+            background: transparent;
+            padding: 10px 0px;
+        }
+    )");
     titleLabel->setAlignment(Qt::AlignCenter);
     mainLayout->addWidget(titleLabel);
 
-    mainLayout->addSpacing(5);
-
-    // Scroll area for content
-    scrollArea = new QScrollArea(this);
-    scrollArea->setWidgetResizable(true);
-    scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    scrollArea->setStyleSheet(R"(
-        QScrollArea {
-            border: none;
-            background: transparent;
-        }
-        QScrollBar:vertical {
-            background: rgba(123, 79, 255, 0.1);
-            width: 10px;
-            border-radius: 5px;
-        }
-        QScrollBar::handle:vertical {
-            background: rgba(123, 79, 255, 0.5);
-            border-radius: 5px;
-        }
-        QScrollBar::handle:vertical:hover {
-            background: rgba(123, 79, 255, 0.7);
-        }
-    )");
-
+    // Content area - NO SCROLL AREA, direct layout
     contentWidget = new QWidget();
-    QVBoxLayout *contentLayout = new QVBoxLayout(contentWidget);
-    contentLayout->setSpacing(20);
-    contentLayout->setContentsMargins(10, 10, 10, 10);
+    contentWidget->setStyleSheet("background: transparent;");
+    
+    // Create a grid layout for better organization
+    QGridLayout *contentGrid = new QGridLayout(contentWidget);
+    contentGrid->setSpacing(15);
+    contentGrid->setContentsMargins(0, 0, 0, 0);
 
-    scrollArea->setWidget(contentWidget);
-    mainLayout->addWidget(scrollArea);
+    mainLayout->addWidget(contentWidget, 1); // Give it stretch
 
-    // Try it yourself button
+    // Try it yourself button with modern styling
     tryButton = new QPushButton("Try It Yourself →", this);
-    tryButton->setFixedSize(220, 55);
-    tryButton->setContentsMargins(50,200,50,100);
+    tryButton->setFixedSize(240, 50);
     tryButton->setCursor(Qt::PointingHandCursor);
 
-    QFont tryFont("Segoe UI", 15, QFont::Bold);
+    QFont tryFont("Segoe UI", 14, QFont::Bold);
     tryButton->setFont(tryFont);
     tryButton->setStyleSheet(R"(
         QPushButton {
             background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                stop:0 #7b4fff, stop:1 #9b6fff);
+                stop:0 #667eea, stop:0.5 #764ba2, stop:1 #f093fb);
             color: white;
             border: none;
-            border-radius: 27px;
+            border-radius: 25px;
+            padding: 12px 24px;
         }
         QPushButton:hover {
             background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                stop:0 #6c3cff, stop:1 #8b5fff);
+                stop:0 #5a6fd8, stop:0.5 #6a4190, stop:1 #de81e9);
+            transform: translateY(-2px);
         }
         QPushButton:pressed {
             background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                stop:0 #5a32cc, stop:1 #7a4ccc);
+                stop:0 #4e5bc6, stop:0.5 #5e377e, stop:1 #cc6fd7);
         }
     )");
 
     mainLayout->addWidget(tryButton, 0, Qt::AlignCenter);
+    mainLayout->addSpacing(10);
 
     setLayout(mainLayout);
 
     // Connect signals
-    connect(backButton, &QPushButton::clicked, this, &TheoryPage::backToMenu);
+    connect(backButton, &BackButton::backRequested, this, &TheoryPage::backToMenu);
     connect(tryButton, &QPushButton::clicked, this, &TheoryPage::tryItYourself);
 }
 
 void TheoryPage::loadTheoryContent()
 {
-    QVBoxLayout *contentLayout = qobject_cast<QVBoxLayout*>(contentWidget->layout());
-    if (!contentLayout) return;
+    QGridLayout *contentGrid = qobject_cast<QGridLayout*>(contentWidget->layout());
+    if (!contentGrid) return;
 
     // Clear existing content
     QLayoutItem *item;
-    while ((item = contentLayout->takeAt(0)) != nullptr) {
+    while ((item = contentGrid->takeAt(0)) != nullptr) {
         delete item->widget();
         delete item;
     }
 
-    // Add theory cards
-    contentLayout->addWidget(createInfoCard("📖 Definition", getDefinition(), "📖"));
-    contentLayout->addWidget(createInfoCard("⏱️ Time Complexity", getTimeComplexity(), "⏱️"));
-    contentLayout->addWidget(createInfoCard("💡 Applications", getApplications(), "💡"));
-    contentLayout->addWidget(createInfoCard("✅ Advantages", getAdvantages(), "✅"));
-    contentLayout->addWidget(createInfoCard("⚠️ Disadvantages", getDisadvantages(), "⚠️"));
+    // Add theory cards in a 2x3 grid layout for better space utilization
+    contentGrid->addWidget(createInfoCard("📖 Definition", getDefinition(), "📖"), 0, 0, 1, 2); // Span 2 columns
+    contentGrid->addWidget(createInfoCard("⏱️ Time Complexity", getTimeComplexity(), "⏱️"), 1, 0);
+    contentGrid->addWidget(createInfoCard("💡 Applications", getApplications(), "💡"), 1, 1);
+    contentGrid->addWidget(createInfoCard("✅ Advantages", getAdvantages(), "✅"), 2, 0);
+    contentGrid->addWidget(createInfoCard("⚠️ Disadvantages", getDisadvantages(), "⚠️"), 2, 1);
 
-    contentLayout->addStretch();
+    // Set column stretch to make cards equal width
+    contentGrid->setColumnStretch(0, 1);
+    contentGrid->setColumnStretch(1, 1);
 }
 
 QWidget* TheoryPage::createInfoCard(const QString &title, const QString &content, const QString &icon)
 {
     QFrame *card = new QFrame();
+    card->setFrameStyle(QFrame::NoFrame);
+    
+    // Modern glassmorphism-inspired design
     card->setStyleSheet(R"(
         QFrame {
-            background-color: white;
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                stop:0 rgba(255, 255, 255, 0.9),
+                stop:0.5 rgba(248, 250, 255, 0.95),
+                stop:1 rgba(240, 245, 255, 0.9));
+            border: 1px solid rgba(255, 255, 255, 0.3);
             border-radius: 16px;
-            padding: 20px;
+            margin: 5px;
         }
     )");
 
+    // Subtle shadow effect
+    QGraphicsDropShadowEffect *shadowEffect = new QGraphicsDropShadowEffect();
+    shadowEffect->setBlurRadius(20);
+    shadowEffect->setColor(QColor(0, 0, 0, 15));
+    shadowEffect->setOffset(0, 8);
+    card->setGraphicsEffect(shadowEffect);
+
     QVBoxLayout *cardLayout = new QVBoxLayout(card);
+    cardLayout->setContentsMargins(20, 18, 20, 18);
     cardLayout->setSpacing(12);
 
-    // Title with icon
+    // Title with modern typography
     QLabel *titleLabel = new QLabel(title);
     QFont titleFont("Segoe UI", 16, QFont::Bold);
     titleLabel->setFont(titleFont);
-    titleLabel->setStyleSheet("color: #2d1b69; background: transparent;");
+    titleLabel->setStyleSheet(R"(
+        QLabel {
+            color: #2d3748;
+            background: transparent;
+            padding: 0px;
+            margin-bottom: 8px;
+        }
+    )");
     cardLayout->addWidget(titleLabel);
 
-    // Content
+    // Content with better readability
     QLabel *contentLabel = new QLabel(content);
     QFont contentFont("Segoe UI", 12);
     contentLabel->setFont(contentFont);
-    contentLabel->setStyleSheet("color: #4a4a4a; background: transparent; line-height: 1.6;");
+    contentLabel->setStyleSheet(R"(
+        QLabel {
+            color: #4a5568;
+            background: transparent;
+            line-height: 1.6;
+            padding: 0px;
+        }
+    )");
     contentLabel->setWordWrap(true);
     contentLabel->setTextFormat(Qt::RichText);
+    contentLabel->setAlignment(Qt::AlignTop | Qt::AlignLeft);
     cardLayout->addWidget(contentLabel);
+
+    // Add some stretch to push content to top
+    cardLayout->addStretch();
 
     card->setLayout(cardLayout);
     return card;
@@ -187,11 +193,11 @@ QWidget* TheoryPage::createInfoCard(const QString &title, const QString &content
 
 QString TheoryPage::getDefinition()
 {
-    if (dsName == "Binary Tree") {
-        return "A <b>Binary Tree</b> is a hierarchical data structure in which each node has at most two children, "
+    if (dsName == "Binary Search Tree") {
+        return "A <b>Binary Search Tree</b> is a hierarchical data structure in which each node has at most two children, "
                "referred to as the <b>left child</b> and <b>right child</b>. It starts with a root node and "
-               "branches out into a tree-like structure. Binary trees are fundamental in computer science and "
-               "form the basis for more complex data structures like Binary Search Trees, AVL Trees, and Heaps.";
+               "branches out into a tree-like structure. Binary Search Trees are fundamental in computer science and "
+               "form the basis for more complex data structures like AVL Trees, and Heaps.";
     } else if (dsName == "Red-Black Tree") {
         return "A <b>Red-Black Tree</b> is a self-balancing Binary Search Tree where each node has an extra bit "
                "for denoting the color (red or black). These color bits ensure that the tree remains approximately "
@@ -210,7 +216,7 @@ QString TheoryPage::getDefinition()
 
 QString TheoryPage::getTimeComplexity()
 {
-    if (dsName == "Binary Tree") {
+    if (dsName == "Binary Search Tree") {
         return "<b>Search:</b> O(n) in worst case (unbalanced), O(log n) for balanced trees<br>"
                "<b>Insertion:</b> O(n) in worst case, O(log n) for balanced trees<br>"
                "<b>Deletion:</b> O(n) in worst case, O(log n) for balanced trees<br>"
@@ -236,7 +242,7 @@ QString TheoryPage::getTimeComplexity()
 
 QString TheoryPage::getApplications()
 {
-    if (dsName == "Binary Tree") {
+    if (dsName == "Binary Search Tree") {
         return "• <b>Expression Trees:</b> Used in compilers for parsing expressions<br>"
                "• <b>Binary Search Trees:</b> Efficient searching and sorting<br>"
                "• <b>Huffman Coding Trees:</b> Data compression algorithms<br>"
@@ -295,7 +301,7 @@ QString TheoryPage::getAdvantages()
 
 QString TheoryPage::getDisadvantages()
 {
-    if (dsName == "Binary Tree") {
+    if (dsName == "Binary Search Tree") {
         return "• Can become unbalanced, leading to O(n) operations<br>"
                "• No guaranteed performance without balancing<br>"
                "• Requires extra memory for pointers<br>"
@@ -330,22 +336,45 @@ void TheoryPage::paintEvent(QPaintEvent *event)
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
 
-    // Create gradient background
+    // Beautiful modern gradient background
     QLinearGradient gradient(0, 0, width(), height());
-    gradient.setColorAt(0.0, QColor(250, 247, 255));
-    gradient.setColorAt(0.5, QColor(242, 235, 255));
-    gradient.setColorAt(1.0, QColor(237, 228, 255));
+    gradient.setColorAt(0.0, QColor(255, 255, 255));      // Pure white at top
+    gradient.setColorAt(0.3, QColor(248, 250, 252));      // Very light blue-gray
+    gradient.setColorAt(0.7, QColor(241, 245, 249));      // Light blue-gray
+    gradient.setColorAt(1.0, QColor(237, 242, 247));      // Slightly darker blue-gray
 
     painter.fillRect(rect(), gradient);
 
-    // Add subtle circular gradients for depth
-    QRadialGradient topCircle(width() * 0.2, height() * 0.15, width() * 0.4);
-    topCircle.setColorAt(0.0, QColor(200, 180, 255, 30));
-    topCircle.setColorAt(1.0, QColor(200, 180, 255, 0));
-    painter.fillRect(rect(), topCircle);
+    // Add subtle geometric patterns for visual interest
+    painter.setOpacity(0.02);
+    QPen patternPen(QColor(99, 102, 241), 1);
+    painter.setPen(patternPen);
+    
+    // Draw subtle diagonal grid pattern
+    int spacing = 60;
+    for (int x = 0; x < width(); x += spacing) {
+        painter.drawLine(x, 0, x, height());
+    }
+    for (int y = 0; y < height(); y += spacing) {
+        painter.drawLine(0, y, width(), y);
+    }
+    
+    painter.setOpacity(1.0);
 
-    QRadialGradient bottomCircle(width() * 0.8, height() * 0.85, width() * 0.5);
-    bottomCircle.setColorAt(0.0, QColor(180, 150, 255, 25));
-    bottomCircle.setColorAt(1.0, QColor(180, 150, 255, 0));
-    painter.fillRect(rect(), bottomCircle);
+    // Add floating accent elements
+    painter.setOpacity(0.08);
+    QBrush accentBrush(QColor(139, 92, 246));
+    painter.setBrush(accentBrush);
+    painter.setPen(Qt::NoPen);
+    
+    // Top-left accent circle
+    painter.drawEllipse(width() * 0.1, height() * 0.1, 120, 120);
+    
+    // Bottom-right accent circle
+    painter.drawEllipse(width() * 0.85, height() * 0.8, 100, 100);
+    
+    // Middle accent element
+    painter.drawEllipse(width() * 0.7, height() * 0.2, 80, 80);
+    
+    painter.setOpacity(1.0);
 }

@@ -17,6 +17,20 @@
 #include <QListWidget>
 #include <QVector>
 #include <QDateTime>
+#include <QSplitter>
+#include <QGroupBox>
+#include <QTabWidget>
+#include <QFontDatabase>
+#include <QLinearGradient>
+#include <QFont>
+#include <QMessageBox>
+#include <QResizeEvent>
+#include <QDateTime>
+#include <QtMath>
+#include <QGraphicsDropShadowEffect>
+#include "backbutton.h"
+#include "stylemanager.h"
+#include "widgetmanager.h"
 
 struct GraphNode {
     int id;
@@ -47,14 +61,14 @@ signals:
     void backToOperations();
 
 protected:
-    void paintEvent(QPaintEvent *event) override;
     void resizeEvent(QResizeEvent *event) override;
 
 private slots:
     void onBackClicked();
     void onAddVertexClicked();
+    void onDeleteVertexClicked();
     void onAddEdgeClicked();
-    void onRemoveVertexClicked();
+    void onDeleteEdgeClicked();
     void onRemoveEdgeClicked();
     void onClearClicked();
     void onStartBFS();
@@ -64,25 +78,25 @@ private slots:
 private:
     // UI setup
     void setupUI();
-    void restyleCombos();
+    void setupVisualizationArea();
+    void setupRightPanel();
+    void setupStepTrace();
+    void setupTraversalControls();
     void refreshCombos();
     void setControlsEnabled(bool enabled);
 
     // Graph logic
-    void layoutNodes();
     void resetHighlights();
-    void addVertexInternal();
     bool addEdgeInternal(int u, int v);
     bool removeVertexInternal(int u);
     bool removeEdgeInternal(int u, int v);
 
-    // Drawing helpers
-    void drawGraph(QPainter &painter);
-    void drawEdge(QPainter &painter, const QPointF &a, const QPointF &b, bool highlighted) const;
-    void drawNode(QPainter &painter, const GraphNode &node) const;
-
     // History/Logging
     void addHistory(const QString &operation, int value1, int value2, const QString &description);
+    void addStepToHistory(const QString &step);
+    void addOperationSeparator();
+    void updateStepTrace();
+    void showAlgorithm(const QString &operation);
     QString getCurrentTime();
 
     // Animation state
@@ -93,37 +107,50 @@ private:
     QSet<int> frontier;
     QTimer *animTimer;
 
-    // UI
-    QPushButton *backButton;
+    // Forward declaration for canvas
+    class GraphCanvas;
+    
+    // Main UI components
+    QSplitter *mainSplitter;
+    QWidget *leftPanel;
+    QWidget *rightPanel;
+    QVBoxLayout *leftLayout;
+    QVBoxLayout *rightLayout;
+    GraphCanvas *canvas;
+    
+    BackButton *backButton;
     QLabel *titleLabel;
-    QLabel *instructionLabel;
     QLabel *statusLabel;
 
     QPushButton *addVertexButton;
     QLineEdit *vertexInput;
-    QComboBox *edgeFromCombo;
-    QComboBox *edgeToCombo;
+    QPushButton *deleteVertexButton;
+    QLineEdit *edgeFromInput;
+    QLineEdit *edgeToInput;
     QPushButton *addEdgeButton;
+    QPushButton *deleteEdgeButton;
 
-    QComboBox *removeVertexCombo;
-    QPushButton *removeVertexButton;
-    QComboBox *removeEdgeFromCombo;
-    QComboBox *removeEdgeToCombo;
-    QPushButton *removeEdgeButton;
-
-    QComboBox *startCombo;
-    QPushButton *bfsButton;
-    QPushButton *dfsButton;
     QPushButton *clearButton;
 
-    // History panel
-    QListWidget *historyList;
+    // Right panel components - Chat box
+    QGroupBox *traceGroup;
+    QTabWidget *traceTabWidget;
+    QListWidget *stepsList;
+    QListWidget *algorithmList;
+    
+    // Right panel components - Traversal controls
+    QGroupBox *traversalGroup;
+    QPushButton *bfsButton;
+    QPushButton *dfsButton;
+    QListWidget *traversalResultList;
 
     // Data
     QVector<GraphNode> nodes;
     QHash<int, QSet<int>> adjacency; // undirected, unweighted
     int nextId;
     QVector<GraphHistoryEntry> history;
+    QVector<QString> stepHistory;
+    QString currentOperation;
 
     // Drawing constants
     const int NODE_RADIUS = 24;

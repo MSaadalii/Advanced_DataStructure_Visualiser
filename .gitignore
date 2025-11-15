@@ -1,27 +1,155 @@
-# Ignore Qt build folders
-/build*/
+# Build directories
 build/
 build-*/
-
-# Ignore CMake build files
+*/build*/
 CMakeFiles/
 CMakeCache.txt
 cmake_install.cmake
 Makefile
+*.ninja
+*.ninja.d
 
-# Ignore Qt generated files
-*.user
+# Qt generated files
+*.moc
+moc_*.cpp
+moc_*.h
+qrc_*.cpp
+ui_*.h
 *.qmlc
+*.jsc
 *.pro.user
+*.pro.user.*
 *.qrc.dep
+*.qrc.depends
 *.autosave
-*.obj
+
+# Compiled Object files
 *.o
+*.obj
+*.ko
+*.elf
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
 *.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
 *.exe
+*.out
+*.app
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+Testing/
+Makefile
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+_deps/
+*.cmake
+!CMakeLists.txt
+
+# Qt Creator
+*.creator.user
+*.creator.user.*
+*.creator.user.*.*
+*.pro.user
+*.pro.user.*
+*.qmlproject.user
+*.qmlproject.user.*
+*.includes
+*.config
+*.files
+*.creator
+*.autosave
+
+# Visual Studio / Visual Studio Code
+.vs/
+.vscode/
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.sln
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Qt specific
+*.qmlc
+*.jsc
+*.qmlproject.user
+*.qmlproject.user.*
+*.qrc.depends
+*.qrc.dep
+
+# Logs and databases
 *.log
 *.cache
+*.db
+*.sqlite
+*.sqlite3
 
-# Ignore misc temporary files
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# Temporary files
 *.tmp
 *.bak
+*.swp
+*~
+*.orig
+*.rej
+
+# IDE - Qt Creator
+*.creator
+*.includes
+*.config
+*.files
+*.creator.user*
+
+# IDE - Others
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Debug files
+*.dSYM/
+*.su
+*.idb
+*.pdb
+
+# Release files
+*.release
+*.release.*
+
+# Coverage
+*.gcov
+*.gcda
+*.gcno

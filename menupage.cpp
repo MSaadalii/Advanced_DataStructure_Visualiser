@@ -75,7 +75,7 @@ void MenuPage::setupUI()
 
     // Create cards for each data structure
     QWidget *treeCard = createMenuCard(
-        "Binary Tree",
+        "Binary Search Tree",
         "Hierarchical structure with nodes and edges",
         "🌳",
         treeButton
@@ -328,7 +328,7 @@ void MenuPage::showEvent(QShowEvent *event)
 void MenuPage::onTreeClicked()
 {
     qDebug() << "Tree visualization opened";
-    emit dataStructureSelected("Binary Tree");
+    emit dataStructureSelected("Binary Search Tree");
 }
 
 void MenuPage::onRedBlackTreeClicked()

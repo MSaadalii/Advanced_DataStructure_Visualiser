@@ -14,6 +14,20 @@
 #include <QListWidget>
 #include <QStackedWidget>
 #include <QScrollArea>
+#include <QSplitter>
+#include <QGroupBox>
+#include <QTabWidget>
+#include <QFontDatabase>
+#include <QLinearGradient>
+#include <QFont>
+#include <QMessageBox>
+#include <QDateTime>
+#include <QDebug>
+#include <QGraphicsDropShadowEffect>
+#include <algorithm>
+#include "backbutton.h"
+#include "stylemanager.h"
+#include "widgetmanager.h"
 
 enum Color { RED, BLACK };
 
@@ -26,18 +40,20 @@ struct RBNode {
     int x, y;
     bool isHighlighted;
     bool isRotating;
+    bool isSearchHighlighted;
+    bool isDeleteHighlighted;
+    bool isNewNode;
+    bool isTraversalHighlighted;
+    bool isVisited;
 
     RBNode(int val) : value(val), color(RED), left(nullptr), right(nullptr),
         parent(nullptr), x(0), y(0), isHighlighted(false),
-        isRotating(false) {}
+        isRotating(false), isSearchHighlighted(false), 
+        isDeleteHighlighted(false), isNewNode(false), 
+        isTraversalHighlighted(false), isVisited(false) {}
 };
 
-struct HistoryEntry {
-    QString operation;
-    int value;
-    QString description;
-    QString timestamp;
-};
+// HistoryEntry removed - now using step tracking system
 
 class RedBlackTree : public QWidget
 {
@@ -64,10 +80,17 @@ private slots:
     void showInsertionAlgorithm();
     void showDeletionAlgorithm();
     void showSearchAlgorithm();
+    void onStartBFS();
+    void onStartDFS();
+    void onTraversalAnimationStep();
 
 private:
     void setupUI();
+    void setupVisualizationArea();
+    void setupRightPanel();
+    void setupStepTrace();
     void setupAlgorithmView();
+    void setupTraversalControls();
 
     // RB Tree operations
     void insertNode(int value);
@@ -96,46 +119,73 @@ private:
     void drawEdge(QPainter &painter, int x1, int y1, int x2, int y2, Color color);
     void clearTree(RBNode *node);
     void resetHighlights(RBNode *node);
+    void resetTraversalHighlights(RBNode *node);
+    
+    // Traversal methods
+    void performBFS();
+    void performDFS();
+    void performDFSRecursive(RBNode* node);
+    void setControlsEnabled(bool enabled);
 
-    // History
-    void addHistory(const QString &operation, int value, const QString &description);
+    // History and step tracking
+    // addHistory removed - now using addStepToHistory
+    void addStepToHistory(const QString &step);
+    void addOperationSeparator();
+    void updateStepTrace();
+    void showAlgorithm(const QString &operation);
     QString getCurrentTime();
 
     // UI Components - Main View
-    QStackedWidget *mainStack;
-    QWidget *treeViewWidget;
-    QWidget *algorithmViewWidget;
-
-    QPushButton *backButton;
+    QSplitter *mainSplitter;
+    QWidget *leftPanel;
+    QWidget *rightPanel;
+    QVBoxLayout *leftLayout;
+    QVBoxLayout *rightLayout;
+    
+    // Main UI components
+    BackButton *backButton;
     QPushButton *insertButton;
     QPushButton *deleteButton;
     QPushButton *searchButton;
     QPushButton *clearButton;
-    QPushButton *viewAlgorithmButton;
+    QPushButton *bfsButton;
+    QPushButton *dfsButton;
 
     QLineEdit *inputField;
     QLabel *titleLabel;
     QLabel *statusLabel;
-    QListWidget *historyList;
+    
+    // Right panel components
+    QGroupBox *traceGroup;
+    QTabWidget *traceTabWidget;
+    QListWidget *stepsList;
+    QListWidget *algorithmList;
+    
+    // Traversal controls
+    QGroupBox *traversalGroup;
+    QListWidget *traversalResultList;
 
-    // Algorithm View Components
-    QPushButton *algorithmBackButton;
-    QPushButton *insertAlgoButton;
-    QPushButton *deleteAlgoButton;
-    QPushButton *searchAlgoButton;
-    QTextEdit *algorithmDisplay;
-    QLabel *algorithmTitleLabel;
+    // Algorithm functionality now integrated in right panel
 
     // Tree data
     RBNode *root;
     RBNode *NIL;  // Sentinel node
 
-    // History
-    QVector<HistoryEntry> history;
+    // History and step tracking
+    // history vector removed - now using stepHistory QStringList
+    QVector<QString> stepHistory;
+    QString currentOperation;
 
     // Animation
     bool isAnimating;
     QTimer *animationTimer;
+    
+    // Traversal animation
+    enum class TraversalType { None, BFS, DFS };
+    TraversalType traversalType;
+    QList<RBNode*> traversalOrder;
+    int traversalIndex;
+    QTimer *traversalAnimTimer;
 
     // Drawing constants
     const int NODE_RADIUS = 25;

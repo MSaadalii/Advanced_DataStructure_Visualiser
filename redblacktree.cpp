@@ -1,15 +1,11 @@
 #include "redblacktree.h"
-#include <QPainter>
-#include <QLinearGradient>
-#include <QFont>
-#include <QMessageBox>
-#include <QDateTime>
-#include <QDebug>
-#include <algorithm>
 
 RedBlackTree::RedBlackTree(QWidget *parent)
     : QWidget(parent)
     , isAnimating(false)
+    , currentOperation("")
+    , traversalType(TraversalType::None)
+    , traversalIndex(0)
 {
     // Initialize NIL node (sentinel)
     NIL = new RBNode(0);
@@ -18,65 +14,95 @@ RedBlackTree::RedBlackTree(QWidget *parent)
     root = NIL;
 
     animationTimer = new QTimer(this);
+    connect(animationTimer, &QTimer::timeout, this, [this]() {
+        update();
+    });
+
+    traversalAnimTimer = new QTimer(this);
+    connect(traversalAnimTimer, &QTimer::timeout, this, &RedBlackTree::onTraversalAnimationStep);
 
     setupUI();
-    setMinimumSize(900, 750);
+    setMinimumSize(1200, 800);
 }
 
 RedBlackTree::~RedBlackTree()
 {
+    // Stop any running animations
+    if (animationTimer) {
+        animationTimer->stop();
+    }
+    if (traversalAnimTimer) {
+        traversalAnimTimer->stop();
+    }
+    
     clearTree(root);
     delete NIL;
 }
 
 void RedBlackTree::setupUI()
 {
-    // Main stacked widget to switch between views
-    mainStack = new QStackedWidget(this);
+    // Main splitter for left (visualization) and right (controls + trace) panels
+    mainSplitter = createManagedWidget<QSplitter>(this);
+    mainSplitter->setOrientation(Qt::Horizontal);
+    StyleManager::instance().applySplitterStyle(mainSplitter);
 
-    QVBoxLayout *mainLayout = new QVBoxLayout(this);
+    setupVisualizationArea();
+    setupRightPanel();
+    setupTraversalControls();
+    
+    // Set splitter proportions (65% visualization, 35% controls+trace)
+    mainSplitter->addWidget(leftPanel);
+    mainSplitter->addWidget(rightPanel);
+    mainSplitter->setSizes({780, 420});
+    
+    // Main layout
+    QHBoxLayout *mainLayout = new QHBoxLayout(this);
     mainLayout->setContentsMargins(0, 0, 0, 0);
-    mainLayout->addWidget(mainStack);
+    mainLayout->addWidget(mainSplitter);
+    setLayout(mainLayout);
+}
 
-    // Create tree view
-    treeViewWidget = new QWidget();
-    QVBoxLayout *treeLayout = new QVBoxLayout(treeViewWidget);
-    treeLayout->setContentsMargins(30, 30, 30, 30);
-    treeLayout->setSpacing(15);
+void RedBlackTree::setupVisualizationArea()
+{
+    leftPanel = new QWidget();
+    leftPanel->setStyleSheet("background: transparent;");
+    leftLayout = new QVBoxLayout(leftPanel);
+    leftLayout->setContentsMargins(40, 30, 20, 30);
+    leftLayout->setSpacing(25);
 
-    // Header
+    // Header with back button and title (exactly like hashmap)
     QHBoxLayout *headerLayout = new QHBoxLayout();
 
-    backButton = new QPushButton("← Back to Operations", treeViewWidget);
-    backButton->setFixedSize(160, 38);
-    backButton->setCursor(Qt::PointingHandCursor);
-    backButton->setStyleSheet(R"(
-        QPushButton {
-            background-color: rgba(123, 79, 255, 0.1);
-            color: #7b4fff;
-            border: 2px solid #7b4fff;
-            border-radius: 19px;
-            padding: 8px 16px;
-            font-size: 11px;
+    backButton = new BackButton(BackButton::BackToOperations);
+
+    // Title (matching hashmap format exactly)
+    titleLabel = new QLabel("Red-Black Tree");
+    QFont titleFont;
+    QStringList preferredFonts = {"Segoe UI", "Poppins", "SF Pro Display", "Arial"};
+    for (const QString &fontName : preferredFonts) {
+        if (QFontDatabase::families().contains(fontName)) {
+            titleFont.setFamily(fontName);
+            break;
         }
-        QPushButton:hover { background-color: rgba(123, 79, 255, 0.2); }
-    )");
-
-    headerLayout->addWidget(backButton);
-    headerLayout->addStretch();
-    treeLayout->addLayout(headerLayout);
-
-    // Title
-    titleLabel = new QLabel("Red-Black Tree Visualization", treeViewWidget);
-    titleLabel->setStyleSheet("color: #2d1b69; font-size: 26px; font-weight: bold;");
+    }
+    titleFont.setPointSize(28);
+    titleFont.setBold(true);
+    titleLabel->setFont(titleFont);
+    titleLabel->setStyleSheet("color: #2c3e50; background: transparent;");
     titleLabel->setAlignment(Qt::AlignCenter);
-    treeLayout->addWidget(titleLabel);
 
-    // Controls
+    headerLayout->addWidget(backButton, 0, Qt::AlignLeft);
+    headerLayout->addStretch();
+    headerLayout->addWidget(titleLabel, 0, Qt::AlignCenter);
+    headerLayout->addStretch();
+
+    leftLayout->addLayout(headerLayout);
+
+    // Controls row (matching hashmap layout)
     QHBoxLayout *controlLayout = new QHBoxLayout();
     controlLayout->setSpacing(10);
 
-    inputField = new QLineEdit(treeViewWidget);
+    inputField = new QLineEdit();
     inputField->setPlaceholderText("Enter value");
     inputField->setFixedSize(150, 40);
     inputField->setStyleSheet(R"(
@@ -91,208 +117,691 @@ void RedBlackTree::setupUI()
         QLineEdit:focus { border-color: #7b4fff; }
     )");
 
-    insertButton = new QPushButton("Insert", treeViewWidget);
-    deleteButton = new QPushButton("Delete", treeViewWidget);
-    searchButton = new QPushButton("Search", treeViewWidget);
-    clearButton = new QPushButton("Clear", treeViewWidget);
-    viewAlgorithmButton = new QPushButton("View Algorithm", treeViewWidget);
-
-    QList<QPushButton*> buttons = {insertButton, deleteButton, searchButton, clearButton};
-    for (auto btn : buttons) {
-        btn->setFixedSize(90, 40);
-        btn->setCursor(Qt::PointingHandCursor);
-        btn->setStyleSheet(R"(
-            QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #7b4fff, stop:1 #9b6fff);
-                color: white;
-                border: none;
-                border-radius: 20px;
-                font-weight: bold;
-                font-size: 12px;
-            }
-            QPushButton:hover { background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #6c3cff, stop:1 #8b5fff); }
-        )");
-    }
-
-    viewAlgorithmButton->setFixedSize(130, 40);
-    viewAlgorithmButton->setCursor(Qt::PointingHandCursor);
-    viewAlgorithmButton->setStyleSheet(R"(
+    // Buttons with updated styling to match hashmap/BST
+    insertButton = new QPushButton("Insert");
+    insertButton->setFixedSize(75, 35);
+    insertButton->setCursor(Qt::PointingHandCursor);
+    insertButton->setStyleSheet(R"(
         QPushButton {
-            background-color: #28a745;
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                stop:0 #7b4fff, stop:1 #9b6fff);
             color: white;
             border: none;
-            border-radius: 20px;
+            border-radius: 17px;
             font-weight: bold;
-            font-size: 12px;
+            font-size: 10px;
         }
-        QPushButton:hover { background-color: #218838; }
+        QPushButton:hover {
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                stop:0 #6c3cff, stop:1 #8b5fff);
+        }
+        QPushButton:disabled { background: #cccccc; }
     )");
+
+    searchButton = new QPushButton("Search");
+    searchButton->setFixedSize(75, 35);
+    searchButton->setCursor(Qt::PointingHandCursor);
+    searchButton->setStyleSheet(R"(
+        QPushButton {
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                stop:0 #4a90e2, stop:1 #6bb6ff);
+            color: white;
+            border: none;
+            border-radius: 17px;
+            font-weight: bold;
+            font-size: 10px;
+        }
+        QPushButton:hover {
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                stop:0 #357abd, stop:1 #5ba0e6);
+        }
+        QPushButton:disabled { background: #cccccc; }
+    )");
+
+    deleteButton = new QPushButton("Delete");
+    deleteButton->setFixedSize(75, 35);
+    deleteButton->setCursor(Qt::PointingHandCursor);
+    deleteButton->setStyleSheet(R"(
+        QPushButton {
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                stop:0 #ff6b6b, stop:1 #ff8e8e);
+            color: white;
+            border: none;
+            border-radius: 17px;
+            font-weight: bold;
+            font-size: 10px;
+        }
+        QPushButton:hover {
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                stop:0 #ff5252, stop:1 #ff7575);
+        }
+        QPushButton:disabled { background: #cccccc; }
+    )");
+
+    clearButton = new QPushButton("Clear");
+    clearButton->setFixedSize(75, 35);
+    clearButton->setCursor(Qt::PointingHandCursor);
+    clearButton->setStyleSheet(R"(
+        QPushButton {
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                stop:0 #95a5a6, stop:1 #bdc3c7);
+            color: white;
+            border: none;
+            border-radius: 17px;
+            font-weight: bold;
+            font-size: 10px;
+        }
+        QPushButton:hover {
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                stop:0 #7f8c8d, stop:1 #95a5a6);
+        }
+        QPushButton:disabled { background: #cccccc; }
+    )");
+
+    // Buttons are already styled individually above
+
+    // viewAlgorithmButton removed - algorithm now integrated in right panel
 
     controlLayout->addStretch();
     controlLayout->addWidget(inputField);
     controlLayout->addWidget(insertButton);
-    controlLayout->addWidget(deleteButton);
     controlLayout->addWidget(searchButton);
+    controlLayout->addWidget(deleteButton);
     controlLayout->addWidget(clearButton);
-    controlLayout->addWidget(viewAlgorithmButton);
+    
     controlLayout->addStretch();
 
-    treeLayout->addLayout(controlLayout);
+    leftLayout->addLayout(controlLayout);
 
-    // Status
-    statusLabel = new QLabel("Tree is empty. Insert values to begin!", treeViewWidget);
-    statusLabel->setStyleSheet("color: #7b4fff; font-size: 11px; padding: 5px;");
+    // Status label
+    statusLabel = new QLabel("Red-Black Tree is empty. Start by inserting a value!");
+    QFont statusFont("Segoe UI", 11);
+    statusLabel->setFont(statusFont);
+    statusLabel->setStyleSheet("color: #7b4fff; padding: 8px;");
     statusLabel->setAlignment(Qt::AlignCenter);
-    treeLayout->addWidget(statusLabel);
+    leftLayout->addWidget(statusLabel);
 
-    // Split view - Tree and History
-    QHBoxLayout *contentLayout = new QHBoxLayout();
-    contentLayout->setSpacing(15);
+    // Visualization area (we'll draw the tree directly on this widget in paintEvent)
+    leftLayout->addStretch();
 
-    // Tree visualization area (70%)
-    treeLayout->addLayout(contentLayout, 1);
-
-    // History panel (30% width)
-    QVBoxLayout *historyLayout = new QVBoxLayout();
-    QLabel *historyTitle = new QLabel("Operation History");
-    historyTitle->setStyleSheet("color: #2d1b69; font-weight: bold; font-size: 14px;");
-    historyLayout->addWidget(historyTitle);
-
-    historyList = new QListWidget();
-    historyList->setStyleSheet(R"(
-        QListWidget {
-            background-color: white;
-            border: 2px solid #d0c5e8;
-            border-radius: 8px;
-            padding: 5px;
-            font-size: 10px;
-            color: #2d1b69;
-        }
-        QListWidget::item {
-            padding: 6px;
-            border-bottom: 1px solid #f0f0f0;
-            color: #2d1b69;
-        }
-        QListWidget::item:hover {
-            background-color: #f5f0ff;
-        }
-        QListWidget::item:selected {
-            background-color: #e8e0ff;
-            color: #2d1b69;
-        }
-    )");
-    historyLayout->addWidget(historyList);
-
-    contentLayout->addStretch(7);
-    contentLayout->addLayout(historyLayout, 3);
-
-    mainStack->addWidget(treeViewWidget);
-
-    // Setup algorithm view
-    setupAlgorithmView();
+    // Setup right panel
+    setupRightPanel();
 
     // Connect signals
-    connect(backButton, &QPushButton::clicked, this, &RedBlackTree::onBackClicked);
+    connect(backButton, &BackButton::backRequested, this, &RedBlackTree::onBackClicked);
     connect(insertButton, &QPushButton::clicked, this, &RedBlackTree::onInsertClicked);
     connect(deleteButton, &QPushButton::clicked, this, &RedBlackTree::onDeleteClicked);
     connect(searchButton, &QPushButton::clicked, this, &RedBlackTree::onSearchClicked);
     connect(clearButton, &QPushButton::clicked, this, &RedBlackTree::onClearClicked);
-    connect(viewAlgorithmButton, &QPushButton::clicked, this, &RedBlackTree::onViewAlgorithmClicked);
     connect(inputField, &QLineEdit::returnPressed, this, &RedBlackTree::onInsertClicked);
 }
 
-void RedBlackTree::setupAlgorithmView()
+// setupAlgorithmView removed - algorithm functionality integrated into right panel
+
+void RedBlackTree::setupRightPanel()
 {
-    algorithmViewWidget = new QWidget();
-    QVBoxLayout *algoLayout = new QVBoxLayout(algorithmViewWidget);
-    algoLayout->setContentsMargins(30, 30, 30, 30);
-    algoLayout->setSpacing(20);
-
-    // Header
-    QHBoxLayout *algoHeaderLayout = new QHBoxLayout();
-
-    algorithmBackButton = new QPushButton("← Back to Tree", algorithmViewWidget);
-    algorithmBackButton->setFixedSize(140, 38);
-    algorithmBackButton->setCursor(Qt::PointingHandCursor);
-    algorithmBackButton->setStyleSheet(R"(
-        QPushButton {
-            background-color: rgba(123, 79, 255, 0.1);
-            color: #7b4fff;
-            border: 2px solid #7b4fff;
-            border-radius: 19px;
-            padding: 8px 16px;
-            font-size: 11px;
+    rightPanel = new QWidget();
+    rightPanel->setMinimumWidth(400);
+    rightPanel->setStyleSheet(R"(
+        QWidget {
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                stop:0 rgba(250, 252, 255, 0.9),
+                stop:1 rgba(245, 249, 255, 0.95));
+            border-left: 1px solid rgba(123, 79, 255, 0.1);
         }
-        QPushButton:hover { background-color: rgba(123, 79, 255, 0.2); }
     )");
 
-    algoHeaderLayout->addWidget(algorithmBackButton);
-    algoHeaderLayout->addStretch();
-    algoLayout->addLayout(algoHeaderLayout);
+    rightLayout = new QVBoxLayout(rightPanel);
+    rightLayout->setContentsMargins(20, 20, 20, 20);
+    rightLayout->setSpacing(15);
 
-    // Title
-    algorithmTitleLabel = new QLabel("Red-Black Tree Algorithms", algorithmViewWidget);
-    algorithmTitleLabel->setStyleSheet("color: #2d1b69; font-size: 24px; font-weight: bold;");
-    algorithmTitleLabel->setAlignment(Qt::AlignCenter);
-    algoLayout->addWidget(algorithmTitleLabel);
+    setupStepTrace();
+}
 
-    // Algorithm selection buttons
-    QHBoxLayout *algoButtonLayout = new QHBoxLayout();
+void RedBlackTree::setupStepTrace()
+{
+    // Add some spacing above the chat for better aesthetics
+    rightLayout->addSpacing(30);
+    
+    // Chat history with dramatically improved styling
+    traceGroup = new QGroupBox("");
+    traceGroup->setStyleSheet(R"(
+        QGroupBox {
+            border: 3px solid qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                stop:0 rgba(138, 43, 226, 0.6),
+                stop:0.5 rgba(30, 144, 255, 0.6),
+                stop:1 rgba(0, 191, 255, 0.6));
+            border-radius: 20px;
+            margin-top: 15px;
+            padding-top: 15px;
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                stop:0 rgba(240, 248, 255, 0.98),
+                stop:0.3 rgba(230, 245, 255, 0.98),
+                stop:0.7 rgba(245, 240, 255, 0.98),
+                stop:1 rgba(250, 245, 255, 0.98));
+            box-shadow: 0px 8px 25px rgba(138, 43, 226, 0.15);
+        }
+    )");
 
-    insertAlgoButton = new QPushButton("Insertion Algorithm", algorithmViewWidget);
-    deleteAlgoButton = new QPushButton("Deletion Algorithm", algorithmViewWidget);
-    searchAlgoButton = new QPushButton("Search Algorithm", algorithmViewWidget);
+    QVBoxLayout *traceLayout = new QVBoxLayout(traceGroup);
+    traceLayout->setContentsMargins(20, 20, 20, 20);
+    traceLayout->setSpacing(15);
 
-    QList<QPushButton*> algoBtns = {insertAlgoButton, deleteAlgoButton, searchAlgoButton};
-    for (auto btn : algoBtns) {
-        btn->setFixedSize(180, 45);
-        btn->setCursor(Qt::PointingHandCursor);
-        btn->setStyleSheet(R"(
-            QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #7b4fff, stop:1 #9b6fff);
-                color: white;
-                border: none;
-                border-radius: 22px;
-                font-weight: bold;
-                font-size: 13px;
-            }
-            QPushButton:hover { background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #6c3cff, stop:1 #8b5fff); }
-        )");
-    }
+    // Add heading inside the box
+    QLabel *traceTitle = new QLabel("🔴⚫ Operation History & Algorithms");
+    traceTitle->setStyleSheet(R"(
+        QLabel {
+            font-weight: bold;
+            font-size: 16px;
+            color: white;
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                stop:0 rgba(138, 43, 226, 0.9),
+                stop:0.5 rgba(30, 144, 255, 0.9),
+                stop:1 rgba(0, 191, 255, 0.9));
+            border-radius: 15px;
+            padding: 10px 25px;
+            margin: 5px;
+        }
+    )");
+    traceTitle->setAlignment(Qt::AlignCenter);
+    traceLayout->addWidget(traceTitle);
 
-    algoButtonLayout->addStretch();
-    algoButtonLayout->addWidget(insertAlgoButton);
-    algoButtonLayout->addWidget(deleteAlgoButton);
-    algoButtonLayout->addWidget(searchAlgoButton);
-    algoButtonLayout->addStretch();
-
-    algoLayout->addLayout(algoButtonLayout);
-
-    // Algorithm display
-    algorithmDisplay = new QTextEdit(algorithmViewWidget);
-    algorithmDisplay->setReadOnly(true);
-    algorithmDisplay->setStyleSheet(R"(
-        QTextEdit {
-            background-color: #f8f9fa;
-            border: 2px solid #d0c5e8;
-            border-radius: 12px;
-            padding: 20px;
-            font-family: 'Courier New', monospace;
-            font-size: 12px;
+    // Create tab widget for steps and algorithms
+    traceTabWidget = new QTabWidget();
+    traceTabWidget->setStyleSheet(R"(
+        QTabWidget::pane {
+            border: 2px solid rgba(123, 79, 255, 0.2);
+            border-radius: 10px;
+            background: white;
+            margin-top: 5px;
+        }
+        QTabWidget::tab-bar {
+            alignment: center;
+        }
+        QTabBar::tab {
+            background: rgba(123, 79, 255, 0.1);
             color: #2d1b69;
-            line-height: 1.6;
+            padding: 8px 16px;
+            margin: 2px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 12px;
+        }
+        QTabBar::tab:selected {
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                stop:0 rgba(123, 79, 255, 0.8),
+                stop:1 rgba(155, 89, 182, 0.8));
+            color: white;
+        }
+        QTabBar::tab:hover:!selected {
+            background: rgba(123, 79, 255, 0.2);
         }
     )");
 
-    algoLayout->addWidget(algorithmDisplay);
+    // Steps tab - using StyleManager for beautiful scroll bars
+    stepsList = new QListWidget();
+    StyleManager::instance().applyStepTraceStyle(stepsList);
 
-    mainStack->addWidget(algorithmViewWidget);
+    // Algorithm tab - using StyleManager for beautiful scroll bars
+    algorithmList = new QListWidget();
+    StyleManager::instance().applyStepTraceStyle(algorithmList);
 
-    // Connect algorithm buttons
-    connect(algorithmBackButton, &QPushButton::clicked, this, &RedBlackTree::onAlgorithmBackClicked);
-    connect(insertAlgoButton, &QPushButton::clicked, this, &RedBlackTree::showInsertionAlgorithm);
-    connect(deleteAlgoButton, &QPushButton::clicked, this, &RedBlackTree::showDeletionAlgorithm);
-    connect(searchAlgoButton, &QPushButton::clicked, this, &RedBlackTree::showSearchAlgorithm);
+    traceTabWidget->addTab(stepsList, "📝 Steps");
+    traceTabWidget->addTab(algorithmList, "⚙️ Algorithm");
+    
+    traceLayout->addWidget(traceTabWidget);
+    rightLayout->addWidget(traceGroup, 1);
+}
+
+void RedBlackTree::setupTraversalControls()
+{
+    // Traversal controls using StyleManager - consistent styling!
+    traversalGroup = new QGroupBox("");
+    StyleManager::instance().applyTraversalGroupStyle(traversalGroup);
+
+    QVBoxLayout *traversalLayout = new QVBoxLayout(traversalGroup);
+    traversalLayout->setContentsMargins(20, 15, 20, 15);
+    traversalLayout->setSpacing(8);
+
+    // Traversal control buttons layout
+    QHBoxLayout *traversalControlLayout = new QHBoxLayout();
+    traversalControlLayout->setSpacing(8);
+
+    bfsButton = new QPushButton("BFS");
+    bfsButton->setFixedSize(50, 30);
+    StyleManager::instance().applyTraversalButtonStyle(bfsButton, "#4a90e2");
+
+    dfsButton = new QPushButton("DFS");
+    dfsButton->setFixedSize(50, 30);
+    StyleManager::instance().applyTraversalButtonStyle(dfsButton, "#28a745");
+
+    traversalControlLayout->addWidget(bfsButton);
+    traversalControlLayout->addWidget(dfsButton);
+    traversalControlLayout->addStretch();
+
+    traversalLayout->addLayout(traversalControlLayout);
+
+    // Beautiful results area using StyleManager
+    traversalResultList = new QListWidget();
+    traversalResultList->setFixedHeight(80);
+    StyleManager::instance().applyTraversalResultListStyle(traversalResultList);
+
+    traversalLayout->addWidget(traversalResultList);
+    rightLayout->addWidget(traversalGroup, 0); // Don't stretch this box
+    
+    // Connect traversal button signals
+    connect(bfsButton, &QPushButton::clicked, this, &RedBlackTree::onStartBFS);
+    connect(dfsButton, &QPushButton::clicked, this, &RedBlackTree::onStartDFS);
+}
+
+void RedBlackTree::addStepToHistory(const QString &step)
+{
+    stepHistory.append(step);
+    updateStepTrace();
+}
+
+void RedBlackTree::addOperationSeparator()
+{
+    stepHistory.append("────────────────────");
+    updateStepTrace();
+}
+
+void RedBlackTree::updateStepTrace()
+{
+    stepsList->clear();
+    
+    for (const QString &step : stepHistory) {
+        QListWidgetItem *item = new QListWidgetItem(step);
+        
+        // Handle separators
+        if (step.contains("────")) {
+            item->setTextAlignment(Qt::AlignCenter);
+            item->setForeground(QColor("#cccccc"));
+            item->setFont(QFont("Segoe UI", 10, QFont::Bold));
+        }
+        // Color code based on step content
+        else if (step.contains("✅") || step.contains("Success") || step.contains("Found")) {
+            item->setForeground(QColor("#28a745"));
+        }
+        else if (step.contains("❌") || step.contains("Error") || step.contains("Failed")) {
+            item->setForeground(QColor("#dc3545"));
+        }
+        else if (step.contains("🔍") || step.contains("Search") || step.contains("Looking")) {
+            item->setForeground(QColor("#17a2b8"));
+        }
+        else if (step.contains("➕") || step.contains("Insert") || step.contains("Add")) {
+            item->setForeground(QColor("#7b4fff"));
+        }
+        else if (step.contains("🗑️") || step.contains("Delete") || step.contains("Remove")) {
+            item->setForeground(QColor("#fd7e14"));
+        }
+        else if (step.contains("🔄") || step.contains("Rotate") || step.contains("Balance")) {
+            item->setForeground(QColor("#6f42c1"));
+        }
+        else if (step.contains("🎨") || step.contains("Color") || step.contains("Red") || step.contains("Black")) {
+            item->setForeground(QColor("#e83e8c"));
+        }
+        else if (step.contains("📍") || step.contains("Position") || step.contains("Direction")) {
+            item->setForeground(QColor("#20c997"));
+        }
+        else {
+            item->setForeground(QColor("#6c757d"));
+        }
+        
+        stepsList->addItem(item);
+    }
+    
+    // Auto-scroll to bottom
+    stepsList->scrollToBottom();
+}
+
+void RedBlackTree::showAlgorithm(const QString &operation)
+{
+    currentOperation = operation;
+    
+    // Add separator between operations if there are already items
+    if (algorithmList->count() > 0) {
+        QListWidgetItem *separator = new QListWidgetItem("────────────────────");
+        separator->setTextAlignment(Qt::AlignCenter);
+        separator->setFlags(Qt::NoItemFlags);
+        separator->setForeground(QColor(189, 195, 199));
+        algorithmList->addItem(separator);
+    }
+    
+    if (operation == "Insert") {
+        // Title
+        QListWidgetItem *title = new QListWidgetItem("🔴⚫ Red-Black Tree Insert Algorithm");
+        title->setForeground(QColor(123, 79, 255)); // Purple for RB tree
+        title->setFont(QFont("Segoe UI", 12, QFont::Bold));
+        algorithmList->addItem(title);
+        
+        // Step 1
+        QListWidgetItem *step1 = new QListWidgetItem("1️⃣ Standard BST Insertion:");
+        step1->setForeground(QColor(52, 73, 94));
+        step1->setFont(QFont("Segoe UI", 11, QFont::Bold));
+        algorithmList->addItem(step1);
+        
+        QListWidgetItem *step1a = new QListWidgetItem("   • Insert node using BST rules");
+        step1a->setForeground(QColor(108, 117, 125));
+        algorithmList->addItem(step1a);
+        
+        QListWidgetItem *step1b = new QListWidgetItem("   • Color new node RED initially");
+        step1b->setForeground(QColor(220, 53, 69));
+        algorithmList->addItem(step1b);
+        
+        // Step 2
+        QListWidgetItem *step2 = new QListWidgetItem("2️⃣ Fix Red-Black Violations:");
+        step2->setForeground(QColor(52, 73, 94));
+        step2->setFont(QFont("Segoe UI", 11, QFont::Bold));
+        algorithmList->addItem(step2);
+        
+        QListWidgetItem *case1 = new QListWidgetItem("   🔄 Case 1: Uncle is RED");
+        case1->setForeground(QColor(220, 53, 69));
+        case1->setFont(QFont("Segoe UI", 10, QFont::Bold));
+        algorithmList->addItem(case1);
+        
+        QListWidgetItem *case1a = new QListWidgetItem("      • Recolor parent & uncle BLACK");
+        case1a->setForeground(QColor(108, 117, 125));
+        algorithmList->addItem(case1a);
+        
+        QListWidgetItem *case1b = new QListWidgetItem("      • Recolor grandparent RED");
+        case1b->setForeground(QColor(108, 117, 125));
+        algorithmList->addItem(case1b);
+        
+        QListWidgetItem *case2 = new QListWidgetItem("   🔄 Case 2: Uncle BLACK (Triangle)");
+        case2->setForeground(QColor(220, 53, 69));
+        case2->setFont(QFont("Segoe UI", 10, QFont::Bold));
+        algorithmList->addItem(case2);
+        
+        QListWidgetItem *case2a = new QListWidgetItem("      • Rotate to convert to Case 3");
+        case2a->setForeground(QColor(108, 117, 125));
+        algorithmList->addItem(case2a);
+        
+        QListWidgetItem *case3 = new QListWidgetItem("   🔄 Case 3: Uncle BLACK (Line)");
+        case3->setForeground(QColor(220, 53, 69));
+        case3->setFont(QFont("Segoe UI", 10, QFont::Bold));
+        algorithmList->addItem(case3);
+        
+        QListWidgetItem *case3a = new QListWidgetItem("      • Rotate grandparent");
+        case3a->setForeground(QColor(108, 117, 125));
+        algorithmList->addItem(case3a);
+        
+        QListWidgetItem *case3b = new QListWidgetItem("      • Swap colors of parent & grandparent");
+        case3b->setForeground(QColor(108, 117, 125));
+        algorithmList->addItem(case3b);
+        
+        // Step 3
+        QListWidgetItem *step3 = new QListWidgetItem("3️⃣ Ensure root is BLACK");
+        step3->setForeground(QColor(52, 73, 94));
+        step3->setFont(QFont("Segoe UI", 11, QFont::Bold));
+        algorithmList->addItem(step3);
+        
+        // Complexity
+        QListWidgetItem *complexity = new QListWidgetItem("⏰ Time Complexity");
+        complexity->setForeground(QColor(155, 89, 182));
+        complexity->setFont(QFont("Segoe UI", 11, QFont::Bold));
+        algorithmList->addItem(complexity);
+        
+        QListWidgetItem *timeComp = new QListWidgetItem("   📊 Guaranteed: O(log n)");
+        timeComp->setForeground(QColor(40, 167, 69));
+        algorithmList->addItem(timeComp);
+        
+        QListWidgetItem *spaceComp = new QListWidgetItem("   💾 Space: O(1) auxiliary");
+        spaceComp->setForeground(QColor(40, 167, 69));
+        algorithmList->addItem(spaceComp);
+    }
+    else if (operation == "Search") {
+        // Title
+        QListWidgetItem *title = new QListWidgetItem("🔍 Red-Black Tree Search Algorithm");
+        title->setForeground(QColor(23, 162, 184)); // Blue for search
+        title->setFont(QFont("Segoe UI", 12, QFont::Bold));
+        algorithmList->addItem(title);
+        
+        // Step 1
+        QListWidgetItem *step1 = new QListWidgetItem("1️⃣ Start at root node");
+        step1->setForeground(QColor(52, 73, 94));
+        step1->setFont(QFont("Segoe UI", 11, QFont::Bold));
+        algorithmList->addItem(step1);
+        
+        QListWidgetItem *step1a = new QListWidgetItem("   • Handle empty tree case");
+        step1a->setForeground(QColor(108, 117, 125));
+        algorithmList->addItem(step1a);
+        
+        // Step 2
+        QListWidgetItem *step2 = new QListWidgetItem("2️⃣ Compare target with current node:");
+        step2->setForeground(QColor(52, 73, 94));
+        step2->setFont(QFont("Segoe UI", 11, QFont::Bold));
+        algorithmList->addItem(step2);
+        
+        QListWidgetItem *equal = new QListWidgetItem("   🎯 target = current → FOUND!");
+        equal->setForeground(QColor(40, 167, 69));
+        algorithmList->addItem(equal);
+        
+        QListWidgetItem *left = new QListWidgetItem("   ⬅️ target < current → go left");
+        left->setForeground(QColor(230, 126, 34));
+        algorithmList->addItem(left);
+        
+        QListWidgetItem *right = new QListWidgetItem("   ➡️ target > current → go right");
+        right->setForeground(QColor(230, 126, 34));
+        algorithmList->addItem(right);
+        
+        // Step 3
+        QListWidgetItem *step3 = new QListWidgetItem("3️⃣ Repeat until found or NULL");
+        step3->setForeground(QColor(52, 73, 94));
+        step3->setFont(QFont("Segoe UI", 11, QFont::Bold));
+        algorithmList->addItem(step3);
+        
+        // Complexity
+        QListWidgetItem *complexity = new QListWidgetItem("⏰ Time Complexity");
+        complexity->setForeground(QColor(155, 89, 182));
+        complexity->setFont(QFont("Segoe UI", 11, QFont::Bold));
+        algorithmList->addItem(complexity);
+        
+        QListWidgetItem *timeComp = new QListWidgetItem("   📊 Guaranteed: O(log n)");
+        timeComp->setForeground(QColor(40, 167, 69));
+        algorithmList->addItem(timeComp);
+        
+        QListWidgetItem *spaceComp = new QListWidgetItem("   💾 Space: O(1) iterative");
+        spaceComp->setForeground(QColor(40, 167, 69));
+        algorithmList->addItem(spaceComp);
+    }
+    else if (operation == "Delete") {
+        // Title
+        QListWidgetItem *title = new QListWidgetItem("🗑️ Red-Black Tree Delete Algorithm");
+        title->setForeground(QColor(253, 126, 20)); // Orange for delete
+        title->setFont(QFont("Segoe UI", 12, QFont::Bold));
+        algorithmList->addItem(title);
+        
+        // Step 1
+        QListWidgetItem *step1 = new QListWidgetItem("1️⃣ Standard BST Deletion:");
+        step1->setForeground(QColor(52, 73, 94));
+        step1->setFont(QFont("Segoe UI", 11, QFont::Bold));
+        algorithmList->addItem(step1);
+        
+        QListWidgetItem *step1a = new QListWidgetItem("   • Find node to delete");
+        step1a->setForeground(QColor(108, 117, 125));
+        algorithmList->addItem(step1a);
+        
+        QListWidgetItem *step1b = new QListWidgetItem("   • Handle 3 cases: 0, 1, or 2 children");
+        step1b->setForeground(QColor(108, 117, 125));
+        algorithmList->addItem(step1b);
+        
+        // Step 2
+        QListWidgetItem *step2 = new QListWidgetItem("2️⃣ Track deleted node color:");
+        step2->setForeground(QColor(52, 73, 94));
+        step2->setFont(QFont("Segoe UI", 11, QFont::Bold));
+        algorithmList->addItem(step2);
+        
+        QListWidgetItem *red = new QListWidgetItem("   🔴 RED deleted → no violations");
+        red->setForeground(QColor(220, 53, 69));
+        algorithmList->addItem(red);
+        
+        QListWidgetItem *black = new QListWidgetItem("   ⚫ BLACK deleted → fix violations");
+        black->setForeground(QColor(52, 58, 64));
+        algorithmList->addItem(black);
+        
+        // Step 3
+        QListWidgetItem *step3 = new QListWidgetItem("3️⃣ Fix Black-Height Violations:");
+        step3->setForeground(QColor(52, 73, 94));
+        step3->setFont(QFont("Segoe UI", 11, QFont::Bold));
+        algorithmList->addItem(step3);
+        
+        QListWidgetItem *case1 = new QListWidgetItem("   🔄 Case 1: Sibling is RED");
+        case1->setForeground(QColor(220, 53, 69));
+        case1->setFont(QFont("Segoe UI", 10, QFont::Bold));
+        algorithmList->addItem(case1);
+        
+        QListWidgetItem *case2 = new QListWidgetItem("   🔄 Case 2: Sibling BLACK, children BLACK");
+        case2->setForeground(QColor(220, 53, 69));
+        case2->setFont(QFont("Segoe UI", 10, QFont::Bold));
+        algorithmList->addItem(case2);
+        
+        QListWidgetItem *case3 = new QListWidgetItem("   🔄 Case 3: Sibling BLACK, left child RED");
+        case3->setForeground(QColor(220, 53, 69));
+        case3->setFont(QFont("Segoe UI", 10, QFont::Bold));
+        algorithmList->addItem(case3);
+        
+        QListWidgetItem *case4 = new QListWidgetItem("   🔄 Case 4: Sibling BLACK, right child RED");
+        case4->setForeground(QColor(220, 53, 69));
+        case4->setFont(QFont("Segoe UI", 10, QFont::Bold));
+        algorithmList->addItem(case4);
+        
+        // Complexity
+        QListWidgetItem *complexity = new QListWidgetItem("⏰ Time Complexity");
+        complexity->setForeground(QColor(155, 89, 182));
+        complexity->setFont(QFont("Segoe UI", 11, QFont::Bold));
+        algorithmList->addItem(complexity);
+        
+        QListWidgetItem *timeComp = new QListWidgetItem("   📊 Guaranteed: O(log n)");
+        timeComp->setForeground(QColor(40, 167, 69));
+        algorithmList->addItem(timeComp);
+        
+        QListWidgetItem *spaceComp = new QListWidgetItem("   💾 Space: O(1) auxiliary");
+        spaceComp->setForeground(QColor(40, 167, 69));
+        algorithmList->addItem(spaceComp);
+    }
+    else if (operation == "BFS") {
+        // Title
+        QListWidgetItem *title = new QListWidgetItem("🌊 Breadth-First Search (BFS) - Red-Black Tree");
+        title->setForeground(QColor(74, 144, 226)); // Blue for BFS
+        title->setFont(QFont("Segoe UI", 12, QFont::Bold));
+        algorithmList->addItem(title);
+        
+        // Step 1
+        QListWidgetItem *step1 = new QListWidgetItem("1️⃣ Level-by-Level Traversal:");
+        step1->setForeground(QColor(52, 73, 94));
+        step1->setFont(QFont("Segoe UI", 11, QFont::Bold));
+        algorithmList->addItem(step1);
+        
+        QListWidgetItem *step1a = new QListWidgetItem("   • Use queue data structure");
+        step1a->setForeground(QColor(108, 117, 125));
+        algorithmList->addItem(step1a);
+        
+        QListWidgetItem *step1b = new QListWidgetItem("   • Start from root node");
+        step1b->setForeground(QColor(108, 117, 125));
+        algorithmList->addItem(step1b);
+        
+        // Step 2
+        QListWidgetItem *step2 = new QListWidgetItem("2️⃣ Process Each Level:");
+        step2->setForeground(QColor(52, 73, 94));
+        step2->setFont(QFont("Segoe UI", 11, QFont::Bold));
+        algorithmList->addItem(step2);
+        
+        QListWidgetItem *step2a = new QListWidgetItem("   • Enqueue root, mark as visited");
+        step2a->setForeground(QColor(108, 117, 125));
+        algorithmList->addItem(step2a);
+        
+        QListWidgetItem *step2b = new QListWidgetItem("   • While queue not empty:");
+        step2b->setForeground(QColor(108, 117, 125));
+        algorithmList->addItem(step2b);
+        
+        QListWidgetItem *step2c = new QListWidgetItem("     - Dequeue node, process it");
+        step2c->setForeground(QColor(108, 117, 125));
+        algorithmList->addItem(step2c);
+        
+        QListWidgetItem *step2d = new QListWidgetItem("     - Enqueue left & right children");
+        step2d->setForeground(QColor(108, 117, 125));
+        algorithmList->addItem(step2d);
+        
+        QListWidgetItem *step2e = new QListWidgetItem("   📋 Order: Level by Level (1→2→3→...)");
+        step2e->setForeground(QColor(74, 144, 226));
+        step2e->setFont(QFont("Segoe UI", 10, QFont::Bold));
+        algorithmList->addItem(step2e);
+        
+        // Complexity
+        QListWidgetItem *complexity = new QListWidgetItem("⏰ Time Complexity");
+        complexity->setForeground(QColor(155, 89, 182));
+        complexity->setFont(QFont("Segoe UI", 11, QFont::Bold));
+        algorithmList->addItem(complexity);
+        
+        QListWidgetItem *timeComp = new QListWidgetItem("   📊 O(n) - visits each node once");
+        timeComp->setForeground(QColor(40, 167, 69));
+        algorithmList->addItem(timeComp);
+        
+        QListWidgetItem *spaceComp = new QListWidgetItem("   💾 Space: O(w) - width of tree");
+        spaceComp->setForeground(QColor(40, 167, 69));
+        algorithmList->addItem(spaceComp);
+    }
+    else if (operation == "DFS") {
+        // Title
+        QListWidgetItem *title = new QListWidgetItem("🏔️ Depth-First Search (DFS) - Red-Black Tree");
+        title->setForeground(QColor(40, 167, 69)); // Green for DFS
+        title->setFont(QFont("Segoe UI", 12, QFont::Bold));
+        algorithmList->addItem(title);
+        
+        // Step 1
+        QListWidgetItem *step1 = new QListWidgetItem("1️⃣ Deep Traversal Strategy:");
+        step1->setForeground(QColor(52, 73, 94));
+        step1->setFont(QFont("Segoe UI", 11, QFont::Bold));
+        algorithmList->addItem(step1);
+        
+        QListWidgetItem *step1a = new QListWidgetItem("   • Use stack data structure (or recursion)");
+        step1a->setForeground(QColor(108, 117, 125));
+        algorithmList->addItem(step1a);
+        
+        QListWidgetItem *step1b = new QListWidgetItem("   • Go as deep as possible first");
+        step1b->setForeground(QColor(108, 117, 125));
+        algorithmList->addItem(step1b);
+        
+        // Step 2
+        QListWidgetItem *step2 = new QListWidgetItem("2️⃣ Traversal Order (Preorder):");
+        step2->setForeground(QColor(52, 73, 94));
+        step2->setFont(QFont("Segoe UI", 11, QFont::Bold));
+        algorithmList->addItem(step2);
+        
+        QListWidgetItem *step2a = new QListWidgetItem("   • Visit ROOT node first");
+        step2a->setForeground(QColor(108, 117, 125));
+        algorithmList->addItem(step2a);
+        
+        QListWidgetItem *step2b = new QListWidgetItem("   • Recursively visit LEFT subtree");
+        step2b->setForeground(QColor(108, 117, 125));
+        algorithmList->addItem(step2b);
+        
+        QListWidgetItem *step2c = new QListWidgetItem("   • Recursively visit RIGHT subtree");
+        step2c->setForeground(QColor(108, 117, 125));
+        algorithmList->addItem(step2c);
+        
+        QListWidgetItem *step2d = new QListWidgetItem("   📋 Order: Root → Left → Right");
+        step2d->setForeground(QColor(220, 53, 69));
+        step2d->setFont(QFont("Segoe UI", 10, QFont::Bold));
+        algorithmList->addItem(step2d);
+        
+        // Complexity
+        QListWidgetItem *complexity = new QListWidgetItem("⏰ Time Complexity");
+        complexity->setForeground(QColor(155, 89, 182));
+        complexity->setFont(QFont("Segoe UI", 11, QFont::Bold));
+        algorithmList->addItem(complexity);
+        
+        QListWidgetItem *timeComp = new QListWidgetItem("   📊 O(n) - visits each node once");
+        timeComp->setForeground(QColor(40, 167, 69));
+        algorithmList->addItem(timeComp);
+        
+        QListWidgetItem *spaceComp = new QListWidgetItem("   💾 Space: O(h) - height of tree");
+        spaceComp->setForeground(QColor(40, 167, 69));
+        algorithmList->addItem(spaceComp);
+    }
+    
+    // Do not auto-switch tabs; keep user's current selection
 }
 
 void RedBlackTree::onBackClicked()
@@ -302,59 +811,27 @@ void RedBlackTree::onBackClicked()
 
 void RedBlackTree::onViewAlgorithmClicked()
 {
-    mainStack->setCurrentWidget(algorithmViewWidget);
-    showInsertionAlgorithm(); // Show insertion by default
+    // Algorithm is now shown in the right panel tab
+    showAlgorithm("Insert"); // Show insertion by default
 }
 
 void RedBlackTree::onAlgorithmBackClicked()
 {
-    mainStack->setCurrentWidget(treeViewWidget);
+    // Algorithm back is now handled by switching tabs
+    traceTabWidget->setCurrentIndex(0); // Switch to Steps tab
 }
 
 void RedBlackTree::showInsertionAlgorithm()
 {
-    algorithmDisplay->setHtml(R"(
-        <h2 style="color: #7b4fff;">Red-Black Tree Insertion Algorithm</h2>
-        <h3>Properties:</h3>
-        <ul>
-            <li>Every node is either RED or BLACK</li>
-            <li>Root is always BLACK</li>
-            <li>All NIL leaves are BLACK</li>
-            <li>Red nodes have BLACK children (no two consecutive red nodes)</li>
-            <li>All paths from root to NIL have same number of black nodes</li>
-        </ul>
-
-        <h3>Algorithm Steps:</h3>
-        <pre>
-<b>1. BST Insertion:</b>
-   - Insert node as in regular BST
-   - Color new node RED
-
-<b>2. Fix Violations:</b>
-   While (node != root AND parent is RED):
-
-   <b>Case 1: Uncle is RED</b>
-      - Recolor parent and uncle to BLACK
-      - Recolor grandparent to RED
-      - Move to grandparent
-
-   <b>Case 2: Uncle is BLACK (Triangle)</b>
-      - Rotate to convert to Case 3
-
-   <b>Case 3: Uncle is BLACK (Line)</b>
-      - Rotate grandparent
-      - Recolor parent and grandparent
-
-<b>3. Final Step:</b>
-   - Color root BLACK
-        </pre>
-
-        <h3>Time Complexity: O(log n)</h3>
-    )");
+    // Algorithm now shown in right panel via showAlgorithm("Insert")
+    showAlgorithm("Insert");
 }
 
 void RedBlackTree::showDeletionAlgorithm()
 {
+    // Algorithm now shown in right panel via showAlgorithm("Delete")
+    showAlgorithm("Delete");
+    /*
     algorithmDisplay->setHtml(R"(
         <h2 style="color: #7b4fff;">Red-Black Tree Deletion Algorithm</h2>
 
@@ -392,11 +869,14 @@ void RedBlackTree::showDeletionAlgorithm()
         </pre>
 
         <h3>Time Complexity: O(log n)</h3>
-    )");
+    )"); */
 }
 
 void RedBlackTree::showSearchAlgorithm()
 {
+    // Algorithm now shown in right panel via showAlgorithm("Search")
+    showAlgorithm("Search");
+    /*
     algorithmDisplay->setHtml(R"(
         <h2 style="color: #7b4fff;">Red-Black Tree Search Algorithm</h2>
 
@@ -426,7 +906,7 @@ void RedBlackTree::showSearchAlgorithm()
 
         <h3>Time Complexity: O(log n)</h3>
         <h3>Space Complexity: O(1) iterative, O(log n) recursive</h3>
-    )");
+    )"); */
 }
 
 void RedBlackTree::onInsertClicked()
@@ -451,6 +931,13 @@ void RedBlackTree::onInsertClicked()
         return;
     }
 
+    // Show algorithm for insert
+    showAlgorithm("Insert");
+    
+    // Add detailed step tracking
+    addStepToHistory("➕ INSERT OPERATION");
+    addStepToHistory(QString("🎯 Target value: %1").arg(value));
+    
     insertNode(value);
     inputField->clear();
     inputField->setFocus();
@@ -483,6 +970,13 @@ void RedBlackTree::onDeleteClicked()
         return;
     }
 
+    // Show algorithm for delete
+    showAlgorithm("Delete");
+    
+    // Add detailed step tracking
+    addStepToHistory("🗑️ DELETE OPERATION");
+    addStepToHistory(QString("🎯 Target for deletion: %1").arg(value));
+    
     deleteNode(value);
     inputField->clear();
 }
@@ -508,6 +1002,13 @@ void RedBlackTree::onSearchClicked()
         return;
     }
 
+    // Show algorithm for search
+    showAlgorithm("Search");
+    
+    // Add detailed step tracking
+    addStepToHistory("🔍 SEARCH OPERATION");
+    addStepToHistory(QString("🎯 Looking for value: %1").arg(value));
+    
     searchNode(value);
     inputField->clear();
 }
@@ -516,10 +1017,18 @@ void RedBlackTree::onClearClicked()
 {
     clearTree(root);
     root = NIL;
-    history.clear();
-    historyList->clear();
+    stepHistory.clear();
+    updateStepTrace();
+    
+    // Clear traversal results
+    traversalResultList->clear();
+    traversalOrder.clear();
+    traversalType = TraversalType::None;
+    traversalIndex = 0;
+    
     statusLabel->setText("Tree cleared!");
-    addHistory("CLEAR", 0, "Entire tree cleared");
+    addStepToHistory("🧹 Tree cleared - all nodes removed");
+    addOperationSeparator();
     update();
 }
 
@@ -528,8 +1037,18 @@ void RedBlackTree::insertNode(int value)
     // Check for duplicate
     if (findNode(root, value) != NIL) {
         statusLabel->setText(QString("Value %1 already exists!").arg(value));
-        addHistory("INSERT", value, QString("Failed: Value %1 already exists").arg(value));
+        addStepToHistory(QString("❌ Insert failed: Value %1 already exists").arg(value));
+        addOperationSeparator();
         return;
+    }
+
+    addStepToHistory(QString("🔍 Checking if value %1 already exists...").arg(value));
+    addStepToHistory("✅ Value is unique, proceeding with insertion");
+
+    if (root == NIL) {
+        addStepToHistory(QString("🌱 Tree is empty, inserting %1 as root").arg(value));
+    } else {
+        addStepToHistory(QString("🌳 Tree has nodes, finding insertion position for %1").arg(value));
     }
 
     isAnimating = true;
@@ -542,19 +1061,26 @@ void RedBlackTree::insertNode(int value)
     RBNode *node = new RBNode(value);
     node->left = node->right = NIL;
 
+    addStepToHistory(QString("🔴 Created new RED node with value %1").arg(value));
+    
     root = BSTInsert(root, node);
+    addStepToHistory("📍 Node inserted using BST insertion rules");
 
     QTimer::singleShot(500, this, [this, node, value]() {
         node->isHighlighted = true;
         statusLabel->setText("Fixing Red-Black properties...");
+        addStepToHistory("🔄 Checking Red-Black tree properties...");
         update();
 
         QTimer::singleShot(800, this, [this, node, value]() {
+            addStepToHistory("⚖️ Applying Red-Black tree balancing rules");
             fixInsert(node);
             node->isHighlighted = false;
 
             statusLabel->setText(QString("Successfully inserted %1").arg(value));
-            addHistory("INSERT", value, QString("Node %1 inserted and tree balanced").arg(value));
+            addStepToHistory(QString("✅ Node %1 successfully inserted and tree balanced").arg(value));
+            addStepToHistory("🎯 Red-Black tree properties maintained");
+            addOperationSeparator();
 
             isAnimating = false;
             insertButton->setEnabled(true);
@@ -729,11 +1255,25 @@ void RedBlackTree::rotateRightSync(RBNode* node)
 
 void RedBlackTree::deleteNode(int value)
 {
+    addStepToHistory(QString("🔍 Searching for node %1 to delete...").arg(value));
     RBNode *node = findNode(root, value);
     if (node == NIL) {
         statusLabel->setText(QString("Value %1 not found!").arg(value));
-        addHistory("DELETE", value, QString("Failed: Value %1 not found").arg(value));
+        addStepToHistory(QString("❌ Delete failed: Value %1 not found in tree").arg(value));
+        addOperationSeparator();
         return;
+    }
+
+    addStepToHistory(QString("🎯 Found node %1, preparing for deletion").arg(value));
+    
+    // Determine deletion case
+    if (node->left == NIL && node->right == NIL) {
+        addStepToHistory("📋 Case: Node has no children (leaf node)");
+    } else if (node->left == NIL || node->right == NIL) {
+        addStepToHistory("📋 Case: Node has one child");
+    } else {
+        addStepToHistory("📋 Case: Node has two children (complex deletion)");
+        addStepToHistory("🔄 Finding inorder successor for replacement");
     }
 
     isAnimating = true;
@@ -744,13 +1284,17 @@ void RedBlackTree::deleteNode(int value)
     // Highlight node to be deleted
     node->isHighlighted = true;
     statusLabel->setText(QString("Deleting %1...").arg(value));
+    addStepToHistory("🔴 Node marked for deletion (highlighted)");
     update();
 
     QTimer::singleShot(800, this, [this, node, value]() {
+        addStepToHistory("⚖️ Applying Red-Black deletion rules");
         root = deleteNodeHelper(root, value);
 
         statusLabel->setText(QString("Successfully deleted %1").arg(value));
-        addHistory("DELETE", value, QString("Node %1 deleted and tree rebalanced").arg(value));
+        addStepToHistory(QString("✅ Node %1 successfully deleted").arg(value));
+        addStepToHistory("🎯 Red-Black tree properties maintained");
+        addOperationSeparator();
 
         isAnimating = false;
         insertButton->setEnabled(true);
@@ -979,16 +1523,29 @@ void RedBlackTree::fixDelete(RBNode* node)
 void RedBlackTree::searchNode(int value)
 {
     resetHighlights(root);
+    
+    if (root == NIL) {
+        addStepToHistory("❌ Tree is empty - search failed");
+        statusLabel->setText("Tree is empty!");
+        addOperationSeparator();
+        return;
+    }
+    
+    addStepToHistory("🌳 Starting search from root");
     RBNode *node = findNode(root, value);
 
     if (node != NIL) {
         node->isHighlighted = true;
         statusLabel->setText(QString("Found %1 in tree!").arg(value));
-        addHistory("SEARCH", value, QString("Node %1 found at position").arg(value));
+        addStepToHistory(QString("🎯 Traversing tree to find %1...").arg(value));
+        addStepToHistory(QString("✅ Success! Found node %1 in tree").arg(value));
+        addStepToHistory("🔍 Node highlighted in visualization");
     } else {
         statusLabel->setText(QString("Value %1 not found!").arg(value));
-        addHistory("SEARCH", value, QString("Value %1 not found in tree").arg(value));
+        addStepToHistory(QString("🎯 Traversing tree to find %1...").arg(value));
+        addStepToHistory(QString("❌ Search failed: Value %1 not found in tree").arg(value));
     }
+    addOperationSeparator();
     update();
 }
 
@@ -1014,26 +1571,7 @@ RBNode* RedBlackTree::findNode(RBNode* node, int value)
 
 
 
-void RedBlackTree::addHistory(const QString &operation, int value, const QString &description)
-{
-    HistoryEntry entry;
-    entry.operation = operation;
-    entry.value = value;
-    entry.description = description;
-    entry.timestamp = getCurrentTime();
-
-    history.append(entry);
-
-    QString displayText = QString("[%1] %2: %3")
-                              .arg(entry.timestamp)
-                              .arg(entry.operation)
-                              .arg(entry.description);
-
-    QListWidgetItem *item = new QListWidgetItem(displayText);
-    item->setForeground(QColor("#2d1b69"));
-    historyList->addItem(item);
-    historyList->scrollToBottom();
-}
+// addHistory function removed - now using addStepToHistory directly
 
 QString RedBlackTree::getCurrentTime()
 {
@@ -1066,6 +1604,15 @@ void RedBlackTree::resetHighlights(RBNode *node)
     resetHighlights(node->right);
 }
 
+void RedBlackTree::resetTraversalHighlights(RBNode *node)
+{
+    if (node == NIL) return;
+    node->isTraversalHighlighted = false;
+    node->isVisited = false;
+    resetTraversalHighlights(node->left);
+    resetTraversalHighlights(node->right);
+}
+
 void RedBlackTree::clearTree(RBNode *node)
 {
     if (node == NIL) return;
@@ -1088,9 +1635,9 @@ void RedBlackTree::paintEvent(QPaintEvent *event)
     painter.fillRect(rect(), gradient);
 
     // Draw tree on the main widget if we're on tree view
-    if (mainStack->currentWidget() == treeViewWidget && root != NIL) {
+    if (root != NIL) {
         // Calculate canvas area (left 70% of content area)
-        int canvasY = 280;
+        int canvasY = 200; // Position like binary search tree
         int canvasHeight = height() - canvasY - 30;
         int canvasWidth = (int)(width() * 0.65);
         QRect canvasRect(30, canvasY, canvasWidth, canvasHeight);
@@ -1132,13 +1679,20 @@ void RedBlackTree::drawNode(QPainter &painter, RBNode *node)
     // Node circle - larger for rotating nodes
     int radius = node->isRotating ? NODE_RADIUS + 5 : NODE_RADIUS;
 
-    if (node->isHighlighted) {
+    if (node->isTraversalHighlighted) {
+        painter.setPen(QPen(QColor(255, 140, 0), 4));  // Orange border for currently visiting
+        painter.setBrush(QColor(255, 165, 0));         // Orange fill
+    } else if (node->isVisited && traversalType != TraversalType::None) {
+        painter.setPen(QPen(QColor(34, 139, 34), 4));  // Green border for visited (only during traversal)
+        painter.setBrush(QColor(50, 205, 50));         // Green fill
+    } else if (node->isHighlighted) {
         painter.setPen(QPen(QColor(255, 215, 0), 4));
         painter.setBrush(node->color == RED ? QColor(255, 150, 150) : QColor(100, 100, 100));
     } else if (node->isRotating) {
         painter.setPen(QPen(QColor(0, 200, 0), 4));
         painter.setBrush(node->color == RED ? QColor(255, 100, 100) : QColor(80, 80, 80));
     } else {
+        // Default Red-Black Tree colors
         painter.setPen(QPen(Qt::black, 2));
         painter.setBrush(node->color == RED ? QColor(220, 53, 69) : QColor(52, 58, 64));
     }
@@ -1158,4 +1712,186 @@ void RedBlackTree::drawEdge(QPainter &painter, int x1, int y1, int x2, int y2, C
 {
     painter.setPen(QPen(color == RED ? QColor(220, 53, 69) : QColor(52, 58, 64), 2));
     painter.drawLine(x1, y1 + NODE_RADIUS, x2, y2 - NODE_RADIUS);
+}
+
+void RedBlackTree::setControlsEnabled(bool enabled)
+{
+    // Back button should NEVER be disabled - user must always be able to go back!
+    if (backButton) backButton->setEnabled(true);
+    
+    insertButton->setEnabled(enabled);
+    deleteButton->setEnabled(enabled);
+    searchButton->setEnabled(enabled);
+    clearButton->setEnabled(enabled);
+    bfsButton->setEnabled(enabled);
+    dfsButton->setEnabled(enabled);
+}
+
+void RedBlackTree::onStartBFS()
+{
+    showAlgorithm("BFS");
+    
+    if (root == NIL) {
+        addStepToHistory("❌ Tree is empty: Please insert nodes first");
+        QMessageBox::warning(this, "Empty Tree", "Please insert nodes to the tree first.");
+        return;
+    }
+    
+    addStepToHistory("🌊 Starting BFS traversal from root");
+    resetTraversalHighlights(root);
+    traversalType = TraversalType::BFS;
+    traversalOrder.clear();
+    traversalIndex = 0;
+    
+    performBFS();
+    
+    QString result = "🌊 BFS Order: ";
+    for (int i = 0; i < traversalOrder.size(); ++i) {
+        result += QString::number(traversalOrder[i]->value);
+        if (i < traversalOrder.size() - 1) result += " → ";
+    }
+    
+    traversalResultList->clear();
+    if (traversalOrder.isEmpty()) {
+        traversalResultList->addItem("❌ No traversal result");
+    } else {
+        traversalResultList->addItem(result);
+    }
+    
+    setControlsEnabled(false);
+    traversalAnimTimer->start(800);
+    statusLabel->setText("Running BFS...");
+    addStepToHistory("✅ BFS traversal order computed, starting animation");
+    addOperationSeparator();
+}
+
+void RedBlackTree::onStartDFS()
+{
+    showAlgorithm("DFS");
+    
+    if (root == NIL) {
+        addStepToHistory("❌ Tree is empty: Please insert nodes first");
+        QMessageBox::warning(this, "Empty Tree", "Please insert nodes to the tree first.");
+        return;
+    }
+    
+    addStepToHistory("🏔️ Starting DFS traversal from root");
+    resetTraversalHighlights(root);
+    traversalType = TraversalType::DFS;
+    traversalOrder.clear();
+    traversalIndex = 0;
+    
+    performDFS();
+    
+    QString result = "🏔️ DFS Order: ";
+    for (int i = 0; i < traversalOrder.size(); ++i) {
+        result += QString::number(traversalOrder[i]->value);
+        if (i < traversalOrder.size() - 1) result += " → ";
+    }
+    
+    traversalResultList->clear();
+    if (traversalOrder.isEmpty()) {
+        traversalResultList->addItem("❌ No traversal result");
+    } else {
+        traversalResultList->addItem(result);
+    }
+    
+    setControlsEnabled(false);
+    traversalAnimTimer->start(800);
+    statusLabel->setText("Running DFS...");
+    addStepToHistory("✅ DFS traversal order computed, starting animation");
+    addOperationSeparator();
+}
+
+void RedBlackTree::performBFS()
+{
+    if (root == NIL) return;
+    
+    addStepToHistory("🔄 Initializing BFS queue");
+    QList<RBNode*> queue;
+    queue.append(root);
+    addStepToHistory(QString("➕ Added root node %1 to queue").arg(root->value));
+    
+    while (!queue.isEmpty()) {
+        RBNode* current = queue.front();
+        queue.pop_front();
+        traversalOrder.append(current);
+        
+        addStepToHistory(QString("🎯 Processing node %1").arg(current->value));
+        
+        if (current->left != NIL) {
+            queue.append(current->left);
+            addStepToHistory(QString("⬅️ Added left child %1 to queue").arg(current->left->value));
+        }
+        if (current->right != NIL) {
+            queue.append(current->right);
+            addStepToHistory(QString("➡️ Added right child %1 to queue").arg(current->right->value));
+        }
+    }
+}
+
+void RedBlackTree::performDFS()
+{
+    if (root == NIL) return;
+    
+    addStepToHistory("🔄 Starting DFS traversal (preorder: Root → Left → Right)");
+    addStepToHistory("📍 Using recursive depth-first approach");
+    
+    // Use recursive DFS for correct preorder traversal
+    performDFSRecursive(root);
+}
+
+void RedBlackTree::performDFSRecursive(RBNode* node)
+{
+    if (node == NIL) return;
+    
+    // Preorder: Process current node first
+    traversalOrder.append(node);
+    addStepToHistory(QString("🎯 Visiting node %1 (preorder)").arg(node->value));
+    
+    // Then recursively visit left subtree
+    if (node->left != NIL) {
+        addStepToHistory(QString("⬅️ Going to left subtree of %1").arg(node->value));
+        performDFSRecursive(node->left);
+    }
+    
+    // Finally recursively visit right subtree
+    if (node->right != NIL) {
+        addStepToHistory(QString("➡️ Going to right subtree of %1").arg(node->value));
+        performDFSRecursive(node->right);
+    }
+}
+
+void RedBlackTree::onTraversalAnimationStep()
+{
+    if (traversalIndex > 0 && traversalIndex <= traversalOrder.size()) {
+        RBNode* prev = traversalOrder[traversalIndex - 1];
+        // Mark previous as visited (persist green), remove highlight
+        prev->isVisited = true;
+        prev->isTraversalHighlighted = false;
+    }
+    
+    if (traversalIndex >= traversalOrder.size()) {
+        QString algo = (traversalType == TraversalType::BFS) ? "BFS" : "DFS";
+        traversalAnimTimer->stop();
+        traversalType = TraversalType::None;
+        
+        // Reset traversal highlights to restore original red/black colors
+        resetTraversalHighlights(root);
+        
+        setControlsEnabled(true);
+        statusLabel->setText("Traversal complete.");
+        addStepToHistory(QString("🎯 %1 traversal completed. Visited %2 nodes").arg(algo).arg(traversalOrder.size()));
+        update();
+        return;
+    }
+    
+    RBNode* current = traversalOrder[traversalIndex];
+    current->isTraversalHighlighted = true;
+    
+    QString algo = (traversalType == TraversalType::BFS) ? "BFS" : "DFS";
+    addStepToHistory(QString("👁️ %1: Currently visiting node %2").arg(algo).arg(current->value));
+    
+    traversalIndex++;
+    update();
 }

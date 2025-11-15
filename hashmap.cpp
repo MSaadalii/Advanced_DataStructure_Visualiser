@@ -110,7 +110,7 @@ void HashMap::addStepToHistory(const QString &step) {
 
 void HashMap::clearSteps() {
     // Don't clear history, just mark a separator
-    stepHistory_.append("--- Operation Complete ---");
+    stepHistory_.append("────────────────────");
 }
 
 const QVector<QString> &HashMap::lastSteps() const {
@@ -196,7 +196,7 @@ bool HashMap::emplaceOrAssign(const QVariant &key, const QVariant &value, bool a
 }
 
 bool HashMap::insert(const QVariant &key, const QVariant &value) {
-    addStep(QStringLiteral("=== INSERT OPERATION ==="));
+    addStep(QStringLiteral("➕ INSERT OPERATION"));
     maybeGrow();
     bool result = emplaceOrAssign(key, value, /*assignIfExists=*/false);
     clearSteps();
@@ -204,14 +204,14 @@ bool HashMap::insert(const QVariant &key, const QVariant &value) {
 }
 
 void HashMap::put(const QVariant &key, const QVariant &value) {
-    addStep(QStringLiteral("=== PUT OPERATION ==="));
+    addStep(QStringLiteral("➕ PUT OPERATION"));
     maybeGrow();
     (void)emplaceOrAssign(key, value, /*assignIfExists=*/true);
     clearSteps();
 }
 
 std::optional<QVariant> HashMap::get(const QVariant &key) {
-    addStep(QStringLiteral("=== SEARCH OPERATION ==="));
+    addStep(QStringLiteral("🔍 SEARCH OPERATION"));
     if (buckets_.empty()) {
         addStep(QStringLiteral("Table is empty → not found"));
         clearSteps();
@@ -254,7 +254,7 @@ std::optional<QVariant> HashMap::get(const QVariant &key) {
 }
 
 bool HashMap::erase(const QVariant &key) {
-    addStep(QStringLiteral("=== DELETE OPERATION ==="));
+    addStep(QStringLiteral("🗑️ DELETE OPERATION"));
     if (buckets_.empty()) {
         addStep(QStringLiteral("Table is empty → nothing to erase"));
         clearSteps();
@@ -305,47 +305,6 @@ bool HashMap::contains(const QVariant &key) {
     return get(key).has_value();
 }
 
-std::optional<QVariant> HashMap::findByValue(const QVariant &value) {
-    addStep("🔍 === SEARCH BY VALUE OPERATION ===");
-    QString valueStr = variantToDisplayString(value);
-    addStep(QString("🎯 Target value: %1").arg(valueStr));
-    addStep(QString("📝 Algorithm: Linear search through all buckets"));
-
-    int totalChecked = 0;
-    // Search through all buckets
-    for (size_t i = 0; i < buckets_.size(); ++i) {
-        addStep(QString("🔎 Checking bucket %1...").arg(i));
-
-        int itemsInBucket = 0;
-        for (const auto &node : buckets_[i]) {
-            itemsInBucket++;
-            totalChecked++;
-            QString currentValue = variantToDisplayString(node.value);
-            QString currentKey = variantToDisplayString(node.key);
-
-            addStep(QString("   Comparing: <%1,%2> value == %3?")
-                        .arg(currentKey, currentValue, valueStr));
-
-            // Compare values
-            if (node.value == value) {
-                addStep(QString("✅ FOUND! Value '%1' at:").arg(valueStr));
-                addStep(QString("   📍 Bucket: %1").arg(i));
-                addStep(QString("   🔑 Key: %1").arg(currentKey));
-                addStep(QString("   📊 Total items checked: %1").arg(totalChecked));
-                return node.key; // Return the key associated with this value
-            }
-        }
-
-        if (itemsInBucket == 0) {
-            addStep(QString("   Bucket %1 is empty").arg(i));
-        }
-    }
-
-    addStep(QString("❌ NOT FOUND: Value '%1' not in any bucket").arg(valueStr));
-    addStep(QString("📊 Total items checked: %1 across %2 buckets")
-                .arg(totalChecked).arg(buckets_.size()));
-    return std::nullopt;
-}
 
 void HashMap::clear() {
     clearSteps();
