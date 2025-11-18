@@ -1609,11 +1609,6 @@ RBNode* RedBlackTree::findNode(RBNode* node, int value)
 
 // addHistory function removed - now using addStepToHistory directly
 
-QString RedBlackTree::getCurrentTime()
-{
-    return QDateTime::currentDateTime().toString("HH:mm:ss");
-}
-
 void RedBlackTree::calculateNodePositions(RBNode *node, int x, int y, int horizontalSpacing)
 {
     if (node == NIL) return;

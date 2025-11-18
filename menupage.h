@@ -15,6 +15,15 @@
 #include <QVector>
 #include <QFrame>
 #include <QGraphicsDropShadowEffect>
+#include <QPainter>
+#include <QLinearGradient>
+#include <QRadialGradient>
+#include <QFont>
+#include <QFontDatabase>
+#include <QDebug>
+#include <QTimer>
+#include <QPaintEvent>
+#include <QShowEvent>
 
 class MenuPage : public QWidget
 {

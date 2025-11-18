@@ -1,11 +1,4 @@
 #include "menupage.h"
-#include <QPainter>
-#include <QLinearGradient>
-#include <QRadialGradient>
-#include <QFont>
-#include <QFontDatabase>
-#include <QDebug>
-#include <QTimer>
 
 MenuPage::MenuPage(QWidget *parent)
     : QWidget(parent)

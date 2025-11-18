@@ -6,6 +6,7 @@
 #include <QShowEvent>
 #include <QEnterEvent>
 #include <QEvent>
+#include <QCursor>
 
 class BackButton : public QPushButton
 {

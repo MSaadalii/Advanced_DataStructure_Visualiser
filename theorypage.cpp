@@ -1,10 +1,4 @@
 #include "theorypage.h"
-#include <QPainter>
-#include <QLinearGradient>
-#include <QRadialGradient>
-#include <QFont>
-#include <QFontDatabase>
-#include <QGraphicsDropShadowEffect>
 
 TheoryPage::TheoryPage(const QString &dataStructureName, QWidget *parent)
     : QWidget(parent)

@@ -1,6 +1,4 @@
 #include "widgetmanager.h"
-#include <QApplication>
-#include <QDebug>
 
 // Global widget manager instance
 std::unique_ptr<WidgetManager> g_widgetManager = nullptr;
@@ -36,24 +34,6 @@ void WidgetManager::stopAllTimers()
             it = m_timers.erase(it);
         }
     }
-}
-
-void WidgetManager::safeDeleteWidget(QWidget *widget)
-{
-    if (!widget) return;
-    
-    // Stop any timers associated with this widget
-    for (auto timer : m_timers) {
-        if (timer && timer->parent() == widget) {
-            timer->stop();
-        }
-    }
-    
-    // Remove from tracking lists
-    m_orphanWidgets.removeAll(QPointer<QWidget>(widget));
-    m_pendingDeletion.removeAll(QPointer<QWidget>(widget));
-    
-    widget->deleteLater();
 }
 
 void WidgetManager::safeDeleteLater(QWidget *widget)
@@ -100,14 +80,6 @@ void WidgetManager::onWidgetDestroyed()
 }
 
 // Convenience functions
-QTimer* createManagedTimer(QObject *parent)
-{
-    if (!g_widgetManager) {
-        g_widgetManager = std::make_unique<WidgetManager>();
-    }
-    return g_widgetManager->createTimer(parent);
-}
-
 void cleanupAllWidgets()
 {
     if (g_widgetManager) {

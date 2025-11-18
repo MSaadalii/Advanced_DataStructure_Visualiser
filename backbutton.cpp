@@ -1,6 +1,4 @@
 #include "backbutton.h"
-#include <QCursor>
-#include <QDebug>
 
 BackButton::BackButton(QWidget *parent)
     : QPushButton("← Back to Operations", parent)

@@ -9,6 +9,15 @@
 #include <QGraphicsOpacityEffect>
 #include <QPropertyAnimation>
 #include <QFrame>
+#include <QPainter>
+#include <QLinearGradient>
+#include <QFont>
+#include <QFontDatabase>
+#include <QDebug>
+#include <QTimer>
+#include <QPixmap>
+#include <QPaintEvent>
+#include <QShowEvent>
 
 class HomePage : public QWidget
 {

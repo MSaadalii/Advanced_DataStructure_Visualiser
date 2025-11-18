@@ -5,6 +5,7 @@
 #include <QTimer>
 #include <QList>
 #include <QPointer>
+#include <QObject>
 #include <memory>
 
 class WidgetManager : public QObject
@@ -31,7 +32,6 @@ public:
     void stopAllTimers();
     
     // Safe widget deletion
-    void safeDeleteWidget(QWidget *widget);
     void safeDeleteLater(QWidget *widget);
     
     // Cleanup methods
@@ -59,7 +59,6 @@ T* createManagedWidget(QWidget *parent = nullptr) {
     return g_widgetManager->createWidget<T>(parent);
 }
 
-QTimer* createManagedTimer(QObject *parent = nullptr);
 void cleanupAllWidgets();
 
 #endif // WIDGETMANAGER_H

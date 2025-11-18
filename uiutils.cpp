@@ -1,5 +1,4 @@
 #include "uiutils.h"
-#include <QFontDatabase>
 
 QString UIUtils::getButtonStyle(const QString &color)
 {
@@ -57,19 +56,6 @@ QString UIUtils::getBackButtonStyle()
     )";
 }
 
-QString UIUtils::getSplitterStyle()
-{
-    return R"(
-        QSplitter::handle {
-            background-color: #e0e0e0;
-            width: 2px;
-        }
-        QSplitter::handle:hover {
-            background-color: #7b4fff;
-        }
-    )";
-}
-
 QString UIUtils::getScrollBarStyle()
 {
     return R"(
@@ -120,28 +106,6 @@ QString UIUtils::getScrollBarStyle()
     )";
 }
 
-QString UIUtils::getGroupBoxStyle()
-{
-    return R"(
-        QGroupBox {
-            font-weight: bold;
-            font-size: 14px;
-            color: #495057;
-            border: 2px solid #e9ecef;
-            border-radius: 8px;
-            margin-top: 10px;
-            padding-top: 10px;
-            background: white;
-        }
-        QGroupBox::title {
-            subcontrol-origin: margin;
-            left: 10px;
-            padding: 0 8px 0 8px;
-            background: white;
-        }
-    )";
-}
-
 QPushButton* UIUtils::createStyledButton(const QString &text, const QString &color)
 {
     QPushButton *button = new QPushButton(text);
@@ -177,20 +141,6 @@ QLabel* UIUtils::createStyledLabel(const QString &text, int fontSize)
     QFont font = getPreferredFont(fontSize);
     label->setFont(font);
     return label;
-}
-
-QListWidget* UIUtils::createStyledListWidget()
-{
-    QListWidget *listWidget = new QListWidget();
-    listWidget->setStyleSheet(getScrollBarStyle());
-    return listWidget;
-}
-
-QGroupBox* UIUtils::createStyledGroupBox(const QString &title)
-{
-    QGroupBox *groupBox = new QGroupBox(title);
-    groupBox->setStyleSheet(getGroupBoxStyle());
-    return groupBox;
 }
 
 QFont UIUtils::getPreferredFont(int size, bool bold)

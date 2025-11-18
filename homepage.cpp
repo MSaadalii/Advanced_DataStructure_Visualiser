@@ -1,11 +1,4 @@
 #include "homepage.h"
-#include <QPainter>
-#include <QLinearGradient>
-#include <QFont>
-#include <QFontDatabase>
-#include <QDebug>
-#include <QTimer>
-#include <QPixmap>
 
 HomePage::HomePage(QWidget *parent)
     : QWidget(parent)

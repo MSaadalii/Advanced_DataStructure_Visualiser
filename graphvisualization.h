@@ -16,7 +16,6 @@
 #include <QHash>
 #include <QListWidget>
 #include <QVector>
-#include <QDateTime>
 #include <QSplitter>
 #include <QGroupBox>
 #include <QTabWidget>
@@ -25,13 +24,14 @@
 #include <QFont>
 #include <QMessageBox>
 #include <QResizeEvent>
-#include <QDateTime>
 #include <QRandomGenerator>
 #include <QtMath>
 #include <QGraphicsDropShadowEffect>
+#include <QPaintEvent>
 #include "backbutton.h"
 #include "stylemanager.h"
 #include "widgetmanager.h"
+#include "uiutils.h"
 
 struct GraphNode {
     int id;
@@ -40,14 +40,6 @@ struct GraphNode {
     bool visited;
     GraphNode() : id(-1), pos(0, 0), highlighted(false), visited(false) {}
     GraphNode(int nid, const QPointF &p) : id(nid), pos(p), highlighted(false), visited(false) {}
-};
-
-struct GraphHistoryEntry {
-    QString operation;
-    int value1;
-    int value2;
-    QString description;
-    QString timestamp;
 };
 
 class GraphVisualization : public QWidget
@@ -95,12 +87,10 @@ private:
     bool removeEdgeInternal(int u, int v);
 
     // History/Logging
-    void addHistory(const QString &operation, int value1, int value2, const QString &description);
     void addStepToHistory(const QString &step);
     void addOperationSeparator();
     void updateStepTrace();
     void showAlgorithm(const QString &operation);
-    QString getCurrentTime();
 
     // Animation state
     enum class TraversalType { None, BFS, DFS };
@@ -153,7 +143,6 @@ private:
     QVector<GraphNode> nodes;
     QHash<int, QSet<int>> adjacency; // undirected, unweighted
     int nextId;
-    QVector<GraphHistoryEntry> history;
     QVector<QString> stepHistory;
     QString currentOperation;
 

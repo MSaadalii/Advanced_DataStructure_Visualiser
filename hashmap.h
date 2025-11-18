@@ -7,6 +7,10 @@
 #include <forward_list>
 #include <optional>
 #include <vector>
+#include <algorithm>
+#include <cmath>
+#include <functional>
+#include <string>
 
 // Hash Map supporting multiple data types for keys and values.
 // Instrumented with a human-readable step trace for visualization.
@@ -42,7 +46,6 @@ public:
     float loadFactor() const;
 
     void rehash(int newBucketCount);
-    void reserve(int expectedElements);
 
     // Visualization helpers
     const QVector<QString> &lastSteps() const;

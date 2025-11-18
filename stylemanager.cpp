@@ -128,22 +128,6 @@ QString StyleManager::getOperationButtonStyle(const QString &color) const
        .arg(color == "#7b4fff" ? "#8b5fff" : color);
 }
 
-QString StyleManager::getInputFieldStyle() const
-{
-    return R"(
-        QLineEdit {
-            padding: 8px 12px;
-            border: 2px solid rgba(123, 79, 255, 0.3);
-            border-radius: 8px;
-            font-size: 12px;
-            background: white;
-        }
-        QLineEdit:focus { 
-            border-color: #7b4fff; 
-        }
-    )";
-}
-
 QString StyleManager::getSplitterStyle() const
 {
     return R"(
@@ -223,34 +207,6 @@ QString StyleManager::getStepTraceStyle() const
     )";
 }
 
-QString StyleManager::getTabWidgetStyle() const
-{
-    return R"(
-        QTabWidget::pane {
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            background: white;
-        }
-        QTabBar::tab {
-            background: #f8f9fa;
-            color: #495057;
-            padding: 8px 16px;
-            margin-right: 2px;
-            border-top-left-radius: 6px;
-            border-top-right-radius: 6px;
-            font-weight: 500;
-        }
-        QTabBar::tab:selected {
-            background: white;
-            color: #7b4fff;
-            border-bottom: 2px solid #7b4fff;
-        }
-        QTabBar::tab:hover:!selected {
-            background: #e9ecef;
-        }
-    )";
-}
-
 void StyleManager::applyTraversalGroupStyle(QGroupBox *groupBox)
 {
     if (groupBox) {
@@ -279,13 +235,6 @@ void StyleManager::applyOperationButtonStyle(QPushButton *button, const QString 
     }
 }
 
-void StyleManager::applyInputFieldStyle(QLineEdit *lineEdit)
-{
-    if (lineEdit) {
-        lineEdit->setStyleSheet(getInputFieldStyle());
-    }
-}
-
 void StyleManager::applySplitterStyle(QWidget *splitter)
 {
     if (splitter) {
@@ -297,13 +246,6 @@ void StyleManager::applyStepTraceStyle(QListWidget *listWidget)
 {
     if (listWidget) {
         listWidget->setStyleSheet(getStepTraceStyle());
-    }
-}
-
-void StyleManager::applyTabWidgetStyle(QTabWidget *tabWidget)
-{
-    if (tabWidget) {
-        tabWidget->setStyleSheet(getTabWidgetStyle());
     }
 }
 
@@ -322,7 +264,3 @@ QFont StyleManager::getPreferredFont(int size, bool bold) const
     return font;
 }
 
-QFont StyleManager::getTitleFont() const
-{
-    return getPreferredFont(28, true);
-}

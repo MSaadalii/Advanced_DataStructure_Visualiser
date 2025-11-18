@@ -1,6 +1,4 @@
 #include "basevisualization.h"
-#include <QLinearGradient>
-#include <QFont>
 
 BaseVisualization::BaseVisualization(const QString &title, QWidget *parent)
     : QWidget(parent)

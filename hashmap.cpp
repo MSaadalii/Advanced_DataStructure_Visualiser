@@ -1,10 +1,5 @@
 #include "hashmap.h"
 
-#include <algorithm>
-#include <cmath>
-#include <functional>
-#include <string>
-
 HashMap::HashMap(int initialBucketCount, float maxLoadFactor)
     : buckets_(static_cast<size_t>(std::max(1, initialBucketCount))),
     numElements_(0),
@@ -387,18 +382,6 @@ void HashMap::rehash(int newBucketCount) {
     buckets_.swap(newBuckets);
     // Append rehash steps to the live steps log.
     for (const auto &s : rehashSteps) stepHistory_.append(s);
-}
-
-void HashMap::reserve(int expectedElements) {
-    if (expectedElements <= 0) return;
-    const float desiredLoad = 0.6f; // target below max for headroom
-    const int requiredBuckets = std::max(1, static_cast<int>(expectedElements / desiredLoad));
-    if (requiredBuckets > bucketCount()) {
-        addStep(QStringLiteral("Reserve(%1) → rehash to %2 buckets")
-                    .arg(expectedElements)
-                    .arg(requiredBuckets));
-        rehash(requiredBuckets);
-    }
 }
 
 QVector<int> HashMap::bucketSizes() const {

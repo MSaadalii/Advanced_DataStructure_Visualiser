@@ -8,6 +8,13 @@
 #include <QGridLayout>
 #include <QScrollArea>
 #include <QFrame>
+#include <QPainter>
+#include <QLinearGradient>
+#include <QRadialGradient>
+#include <QFont>
+#include <QFontDatabase>
+#include <QGraphicsDropShadowEffect>
+#include <QPaintEvent>
 #include "backbutton.h"
 
 class TheoryPage : public QWidget

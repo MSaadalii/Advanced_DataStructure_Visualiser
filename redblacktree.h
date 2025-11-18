@@ -21,7 +21,6 @@
 #include <QLinearGradient>
 #include <QFont>
 #include <QMessageBox>
-#include <QDateTime>
 #include <QDebug>
 #include <QRandomGenerator>
 #include <QGraphicsDropShadowEffect>
@@ -135,7 +134,6 @@ private:
     void addOperationSeparator();
     void updateStepTrace();
     void showAlgorithm(const QString &operation);
-    QString getCurrentTime();
 
     // UI Components - Main View
     QSplitter *mainSplitter;

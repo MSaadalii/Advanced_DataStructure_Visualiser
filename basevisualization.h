@@ -14,6 +14,8 @@
 #include <QTabWidget>
 #include <QFontDatabase>
 #include <QGraphicsDropShadowEffect>
+#include <QLinearGradient>
+#include <QFont>
 
 class BaseVisualization : public QWidget
 {
@@ -68,7 +70,6 @@ private slots:
 
 private:
     void setupHeader();
-    void applyCommonStyles();
 };
 
 #endif // BASEVISUALIZATION_H

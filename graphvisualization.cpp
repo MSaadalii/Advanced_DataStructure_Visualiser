@@ -1,5 +1,4 @@
 #include "graphvisualization.h"
-#include "uiutils.h"
 
 // Dedicated canvas widget for drawing the graph
 class GraphVisualization::GraphCanvas : public QWidget
@@ -36,21 +35,6 @@ protected:
         
         // Layout nodes within this widget's bounds
         layoutNodesInCanvas();
-        
-        // Draw debug info
-        painter.setPen(Qt::black);
-        QFont debugFont("Arial", 10);
-        painter.setFont(debugFont);
-        painter.drawText(10, 20, QString("Nodes: %1").arg(graphViz->nodes.size()));
-        if (!graphViz->nodes.isEmpty()) {
-            painter.drawText(10, 40, QString("Node 0: (%1, %2)").arg(graphViz->nodes[0].pos.x()).arg(graphViz->nodes[0].pos.y()));
-        }
-        
-        // Draw center dot
-        QPointF center(width() / 2, height() / 2);
-        painter.setPen(QPen(Qt::red, 2));
-        painter.setBrush(Qt::red);
-        painter.drawEllipse(center.x() - 5, center.y() - 5, 10, 10);
         
         // Draw graph
         drawGraph(painter);
@@ -1380,12 +1364,6 @@ void GraphVisualization::resizeEvent(QResizeEvent *event)
 }
 
 // Drawing functions moved to GraphCanvas class
-
-
-QString GraphVisualization::getCurrentTime()
-{
-    return QDateTime::currentDateTime().toString("HH:mm:ss");
-}
 
 
 
